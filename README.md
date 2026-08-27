@@ -34,6 +34,15 @@ Go SDK 的模块路径为 `github.com/bsv8/bitcoin-libp2p`，TypeScript 包名�
 `@bsv8/bitcoin-libp2p`。两端都采用私钥分离模型：SDK 只取得业务公钥和两个
 受限的 typed 签名能力，不负责保存、传输或管理业务私钥。
 
+当前双语言版本为 `0.1.0`：
+
+```text
+go get github.com/bsv8/bitcoin-libp2p@v0.1.0
+npm install @bsv8/bitcoin-libp2p@0.1.0
+```
+
+版本清单、发布门禁和发布顺序见 [双语言发布说明](release/README.md)。
+
 ```go
 localSigner, _ := signer.NewLocalSigner(testOnlyKey) // TEST-ONLY；生产实现应连接受保护 signer
 h, err := golibp2p.NewHost(golibp2p.HostConfig{

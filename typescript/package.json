@@ -1,14 +1,26 @@
 {
   "name": "@bsv8/bitcoin-libp2p",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "license": "AGPL-3.0-only",
   "description": "Standard libp2p secp256k1 identity with a typed remote-signer boundary",
   "type": "module",
   "exports": {
-    ".": "./dist/index.js",
-    "./identity": "./dist/identity/index.js",
-    "./signer": "./dist/signer/index.js",
-    "./libp2p": "./dist/libp2p/index.js"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./identity": {
+      "types": "./dist/identity/index.d.ts",
+      "import": "./dist/identity/index.js"
+    },
+    "./signer": {
+      "types": "./dist/signer/index.d.ts",
+      "import": "./dist/signer/index.js"
+    },
+    "./libp2p": {
+      "types": "./dist/libp2p/index.d.ts",
+      "import": "./dist/libp2p/index.js"
+    }
   },
   "files": [
     "README.md",

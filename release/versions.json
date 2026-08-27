@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "protocol": {
+    "id": "bitcoin-libp2p",
+    "version": 1,
+    "goModuleMajor": 0
+  },
+  "packages": {
+    "npm": {
+      "name": "@bsv8/bitcoin-libp2p",
+      "version": "0.1.0"
+    },
+    "go": {
+      "module": "github.com/bsv8/bitcoin-libp2p",
+      "version": "0.1.0",
+      "tag": "v0.1.0"
+    }
+  }
+}
