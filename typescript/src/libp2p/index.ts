@@ -184,13 +184,21 @@ export function createIdentityAdapter (signer: TypedSigner, options?: IdentityAd
 }
 
 export interface HostConfig {
+  /** 业务公钥与受限 typed 签名能力；不会向 host 暴露 raw 私钥。 */
   signer: TypedSigner
+  /** host 要监听的完整 multiaddr；浏览器出站 host 通常留空。 */
   listenAddrs?: Multiaddr[]
+  /** 应用显式选择的 libp2p transport 列表。 */
   transports?: Array<(components: any) => Transport>
+  /** 额外的 stream muxer；默认始终包含 Yamux。 */
   streamMuxers?: Array<(components: any) => StreamMuxerFactory>
+  /** 额外 libp2p service；默认始终包含 Identify 与 Identify Push。 */
   services?: ServiceFactoryMap<ServiceMap>
+  /** 连接准入策略，例如限制可拨号的地址。 */
   connectionGater?: Libp2pOptions['connectionGater']
+  /** signer 单次操作超时毫秒数；必须为正数，否则使用默认值。 */
   signTimeoutMs?: number
+  /** 是否在创建后立即启动 host。 */
   start?: boolean
 }
 

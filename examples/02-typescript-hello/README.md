@@ -47,7 +47,7 @@ node examples/02-typescript-hello/dist/main.js --mode client \
 
 ## API 对照
 
-`new LocalSigner(randomPrivateKey())` 只生成 Demo identity；`createHost` 负责 SDK 的标准 host 组装，应用显式注入 `tcp()`；`node.handle` 注册应用协议；client 使用 `node.dial`、`authenticateConnection` 和 `newStream`。 `finally` 中的 `node.stop()` 是示例的一部分。实现见 [src/main.ts](src/main.ts)。
+`new LocalSigner(randomPrivateKey())` 只生成 Demo identity；`createHost` 负责 SDK 的标准 host 组装，应用显式注入 `tcp()`；`node.handle` 注册应用协议；client 使用 `node.dial`、`authenticateConnection`、`newStream` 和 `readStreamToEnd`。每条 stream 都先启动读取 Promise，再 `send` 并 `close` 本地写端。`finally` 中的 `node.stop()` 是示例的一部分。实现见 [src/main.ts](src/main.ts)。
 
 E2E 会先 `npm pack` 正式 SDK，再把 tarball 离线安装进临时消费者目录，验证 `bitcoin-libp2p` 公开 exports 与声明可被消费者解析；Demo 自身不会进入 SDK tarball。
 

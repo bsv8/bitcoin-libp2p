@@ -50,14 +50,14 @@ WebRTC Direct：
 
 ```text
 http://127.0.0.1:8080/?addr=<URL 编码后的 ready.address>&transport=websocket
-http://127.0.0.1:8080/?addr=<URL 编码后的 ready.address>&transport=webrtc-direct
+http://127.0.0.1:8080/?addr=<URL 编码后的 ready.address>&transport=webrtc-direct&expected-public-key=<ready.publicKey>
 ```
 
 两种 transport 都应显示 `PASS`、`hello, browser hello` 和两条 stream；页面不会从 WebRTC Direct 自动降级为 WebSocket。
 
 ## API 对照
 
-Window 的 `WorkerSigner` 实现 `TypedSigner`，`createHost` 显式注入 `webSockets()` 或 `webRTCDirect()`；client 用 `node.dial`、`authenticateConnection` 和 `connection.newStream`。Worker 内使用 `LocalSigner` 执行两种 typed purpose，native Go 端只实现标准 libp2p stream handler。runner 用 full Chromium `headless: true`、`channel: 'chromium'` 检查 authenticated identity、页面错误、console error、crash 和 timeout。
+Window 的 `WorkerSigner` 实现 `TypedSigner`；WebSocket 使用 `createHost`，WebRTC Direct 使用 `createWebRTCDirectDialer` 和 `dialAuthenticatedWebRTCDirect`，并要求从 ready 元数据独立传入 `expected-public-key`。两种路径的响应读取都使用 `readStreamToEnd`。Worker 内使用 `LocalSigner` 执行两种 typed purpose，native Go 端只实现标准 libp2p stream handler。runner 用 full Chromium `headless: true`、`channel: 'chromium'` 检查 authenticated identity、页面错误、console error、crash 和 timeout。
 
 ## 私钥边界
 

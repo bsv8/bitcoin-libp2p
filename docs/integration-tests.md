@@ -25,6 +25,14 @@ a system-installed Chromium executable. Both commands use local random ports,
 bounded timeouts, cleanup traps, and no public network. They are not invoked by
 ordinary tests and are not required CI jobs.
 
+V1.1 的浏览器入口还会断言完整 Direct endpoint（主机、UDP 端口、certhash 和 `/p2p`）
+与独立 expected public key；`./scripts/test-browser-integration.sh` 默认使用 `acceptance`
+（正式验收）模式执行 20 次
+独立 Direct 正向场景，并执行错误端口、错误 certhash、错误地址 PeerId、错误 expected
+public key 和外部 Abort 负向场景。每次失败都必须有结构化 `errorCode`/`errorStage`，且
+`pendingSigners` 为 0；另外执行 DNS localhost 解析成功、DNS 不可用、真实 Go stream reset、
+证书轮换旧地址拒绝/新地址成功。
+
 The Demo entry points are a separate developer-facing path:
 
 - [`examples/README.md`](../examples/README.md) is the five-minute Hello path;
@@ -66,6 +74,15 @@ Then execute the explicit browser suite from the repository root:
 ./scripts/test-browser-integration.sh
 ```
 
+默认 `acceptance` 模式要求 WebSocket 和 WebRTC Direct 各至少重复 20 次，不能通过环境变量
+把正式验收静默缩短。只想快速诊断环境时应显式使用 `smoke`（冒烟）模式；最终总结会报告
+真实模式与次数：
+
+```text
+BROWSER_TEST_MODE=smoke BROWSER_WEBSOCKET_REPEATS=1 BROWSER_DIRECT_REPEATS=1 \
+  ./scripts/test-browser-integration.sh
+```
+
 Missing Playwright/Chromium is a clear test-environment failure, not a skipped
 success. The browser test remains opt-in by command and is not added to the
 ordinary test command or a mandatory CI workflow.
@@ -100,6 +117,35 @@ either SDK host assembler. The developer Demo uses the separate
 `/bitcoin-libp2p/demo/hello/1.0.0` protocol documented in
 [`examples/protocol.md`](../examples/protocol.md).
 
+## V1.1 验收记录（2026-08-27）
+
+以下命令在本地锁定依赖上通过：
+
+```text
+go test ./...
+go vet ./...
+(cd typescript && npm test)
+./scripts/test-integration.sh
+./scripts/test-browser-integration.sh
+./scripts/test-demos.sh --all
+make release-check
+```
+
+其中 TypeScript 单元测试当前为 41 tests；WebSocket 和 WebRTC Direct 浏览器场景各完成 20/20 正向重复；错误端口/certhash 在拨号阶段
+返回 `ERR_WEBRTC_DIRECT_DIAL/dial`，错误地址 PeerId/期望公钥返回
+`ERR_WEBRTC_DIRECT_PEER_ID/validate`，DNS 不可用返回
+`ERR_WEBRTC_DIRECT_RESOLVE/resolve`，外部取消返回 `ERR_WEBRTC_DIRECT_TIMEOUT/dial`。
+公开 `resolveWebRTCDirectEndpoint()` 在 resolver 忽略取消信号时返回
+`ERR_WEBRTC_DIRECT_RESOLVE/resolve`；整体 Direct dial 的 DNS resolver 超时则返回
+`ERR_WEBRTC_DIRECT_TIMEOUT/dial` 且不调用 `node.dial()`。证书轮换场景保持
+PeerId/Noise 身份不变，旧 certhash 测试使用新服务器的 host、UDP 端口和 PeerId，仅替换
+certhash，并返回 `DIAL/dial`；新地址 PASS。真实 Go reset 被 `/stream` 转换为
+`ERR_STREAM_ABORTED/stream`。没有 WebSocket fallback，所有场景报告 `pendingSigners=0`。
+`make release-check` 同时验证 `0.2.0` 正式 tarball 的两个
+新 subpath、声明、source map、运行时 import 和 TypeScript 消费者，并按
+[`npm-audit-risk-acceptance-0.2.0.json`](../release/npm-audit-risk-acceptance-0.2.0.json)
+精确核对限期接受的生产依赖 audit 结果。
+
 The cross-process matrix is not accepted merely because an endpoint prints
 `OK`. Each client result must be parsed and compared with the server's actual
 PeerId, the expected compressed public key, and the `/p2p` address component.
@@ -107,7 +153,7 @@ SDK-to-SDK remote-signer cases must keep the test private key outside the host
 process. Native controls must have an isolated dependency graph and must not
 import or link this SDK, including its test echo package.
 
-## Acceptance record
+## V1 baseline acceptance record
 
 On 2026-08-26 the final acceptance passed: the Go cancellation contract returns
 after Context cancellation, the required SDK-to-native dial directions and

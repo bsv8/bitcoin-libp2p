@@ -2,12 +2,12 @@
 // assembles standard libp2p; this application owns the Hello handler.
 import { randomBytes } from 'node:crypto'
 import { createInterface } from 'node:readline'
-import type { Stream, StreamCloseEvent, StreamMessageEvent } from '@libp2p/interface'
 import { tcp } from '@libp2p/tcp'
 import { multiaddr, type Multiaddr } from '@multiformats/multiaddr'
 import { authenticateConnection, createHost } from 'bitcoin-libp2p/libp2p'
 import { bytesToHex, hexToBytes, validatePublicKey } from 'bitcoin-libp2p/identity'
 import { LocalSigner } from 'bitcoin-libp2p/signer'
+import { readStreamToEnd } from 'bitcoin-libp2p/stream'
 
 const PROTOCOL = '/bitcoin-libp2p/demo/hello/1.0.0'
 const MAX_MESSAGE = 1 << 10
@@ -66,7 +66,7 @@ async function main (): Promise<void> {
 
   try {
     await node.handle(PROTOCOL, async stream => {
-      const input = await readAll(stream)
+      const input = await readStreamToEnd(stream)
       if (input.length === 0 || input.length > MAX_MESSAGE || !isUtf8(input)) {
         stream.abort(new Error('invalid Hello message'))
         return
@@ -108,9 +108,10 @@ async function main (): Promise<void> {
     })
     for (let streamNumber = 0; streamNumber < 2; streamNumber++) {
       const stream = await connection.newStream(PROTOCOL, { signal: AbortSignal.timeout(15_000) })
+      const responsePromise = readStreamToEnd(stream)
       stream.send(encodedMessage)
       await stream.close()
-      const response = new TextDecoder('utf-8', { fatal: true }).decode(await readAll(stream))
+      const response = new TextDecoder('utf-8', { fatal: true }).decode(await responsePromise)
       if (response !== `hello, ${message}`) throw new Error(`unexpected Hello response ${JSON.stringify(response)}`)
     }
     emit({
@@ -138,62 +139,6 @@ function randomPrivateKey (): Uint8Array {
       // Try another random scalar.
     }
   }
-}
-
-async function readAll (stream: Stream): Promise<Uint8Array> {
-  const chunks: Uint8Array[] = []
-  return await new Promise<Uint8Array>((resolve, reject) => {
-    let settled = false
-    const output = (): Uint8Array => {
-      const result = new Uint8Array(chunks.reduce((size, chunk) => size + chunk.length, 0))
-      let offset = 0
-      for (const chunk of chunks) {
-        result.set(chunk, offset)
-        offset += chunk.length
-      }
-      return result
-    }
-    const cleanup = (): void => {
-      stream.removeEventListener('message', onMessage)
-      stream.removeEventListener('end', onEnd)
-      stream.removeEventListener('remoteCloseWrite', onRemoteCloseWrite)
-      stream.removeEventListener('close', onClose)
-    }
-    const finish = (force = false): void => {
-      if (settled) return
-      if (stream.readBufferLength > 0) {
-        queueMicrotask(() => { finish(force) })
-        return
-      }
-      if (!force && !stream.readableEnded && stream.remoteWriteStatus !== 'closed') return
-      settled = true
-      cleanup()
-      resolve(output())
-    }
-    const onMessage = (event: StreamMessageEvent): void => {
-      const chunk = event.data
-      chunks.push(chunk instanceof Uint8Array ? chunk : chunk.subarray())
-    }
-    const onEnd = (): void => { finish() }
-    const onRemoteCloseWrite = (): void => { queueMicrotask(() => { finish() }) }
-    const onClose = (event: StreamCloseEvent): void => {
-      if (event.error != null) {
-        settled = true
-        cleanup()
-        reject(event.error)
-        return
-      }
-      finish(true)
-    }
-    stream.addEventListener('message', onMessage)
-    stream.addEventListener('end', onEnd)
-    stream.addEventListener('remoteCloseWrite', onRemoteCloseWrite)
-    stream.addEventListener('close', onClose)
-    // A fast native peer can finish its writable end before the application
-    // handler is invoked. Check the state after queued buffered data has had a
-    // chance to dispatch so the read does not wait for an already-fired event.
-    queueMicrotask(() => { finish() })
-  })
 }
 
 function isUtf8 (value: Uint8Array): boolean {

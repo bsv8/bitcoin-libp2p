@@ -18,6 +18,8 @@
     "src/index.ts",
     "src/identity/**/*.ts",
     "src/signer/**/*.ts",
-    "src/libp2p/**/*.ts"
+    "src/libp2p/**/*.ts",
+    "src/stream/**/*.ts",
+    "src/webrtc-direct/**/*.ts"
   ]
 }

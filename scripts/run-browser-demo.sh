@@ -54,9 +54,11 @@ go_pid=$!
 exec 3>"$control_fifo"
 
 address=""
+public_key=""
 for _ in $(seq 1 300); do
   if [[ -s "$run_dir/go.stdout" ]]; then
     address="$(python3 -c 'import json,sys; print(json.loads(open(sys.argv[1], encoding="utf-8").readline())["address"])' "$run_dir/go.stdout" 2>/dev/null || true)"
+    public_key="$(python3 -c 'import json,sys; print(json.loads(open(sys.argv[1], encoding="utf-8").readline())["publicKey"])' "$run_dir/go.stdout" 2>/dev/null || true)"
     if [[ -n "$address" ]]; then break; fi
   fi
   if ! kill -0 "$go_pid" 2>/dev/null; then
@@ -84,8 +86,9 @@ if ! kill -0 "$http_pid" 2>/dev/null; then
 fi
 
 encoded_address="$(python3 -c 'import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1], safe=""))' "$address")"
+encoded_public_key="$(python3 -c 'import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1], safe=""))' "$public_key")"
 echo "native Go ready address: $address"
-echo "Open: http://127.0.0.1:$http_port/?addr=$encoded_address&transport=$transport"
+echo "Open: http://127.0.0.1:$http_port/?addr=$encoded_address&transport=$transport&expected-public-key=$encoded_public_key"
 echo "Press Ctrl-C to stop both servers."
 
 while kill -0 "$go_pid" 2>/dev/null && kill -0 "$http_pid" 2>/dev/null; do

@@ -62,7 +62,7 @@ node examples/04-remote-signer/typescript/dist/host.js --mode client \
 
 ## API 对照
 
-Go 的 `processSigner` 实现 SDK `signer.Signer`，只序列化固定 purpose 后交给 `golibp2p.NewHost(HostConfig{Signer: ...})`；TypeScript 的 `ProcessSigner` 实现 `TypedSigner`，再交给 `createHost({ signer, transports: [tcp()] })`。两端 adapter 都按绑定公钥复验签名，主流程仍使用 `AuthenticatedPeerFromConn`/`authenticateConnection` 和两条 Hello stream。实现位于 [Go host](go/host/main.go)、[Go signer](go/signer/main.go)、[TS host](typescript/src/host.ts) 和 [TS signer](typescript/src/signer.ts)。
+Go 的 `processSigner` 实现 SDK `signer.Signer`，只序列化固定 purpose 后交给 `golibp2p.NewHost(HostConfig{Signer: ...})`；TypeScript 的 `ProcessSigner` 实现 `TypedSigner`，再交给 `createHost({ signer, transports: [tcp()] })`。两端 adapter 都按绑定公钥复验签名，主流程仍使用 `AuthenticatedPeerFromConn`/`authenticateConnection`、`readStreamToEnd` 和两条 Hello stream。实现位于 [Go host](go/host/main.go)、[Go signer](go/signer/main.go)、[TS host](typescript/src/host.ts) 和 [TS signer](typescript/src/signer.ts)。
 
 ## 私钥边界
 

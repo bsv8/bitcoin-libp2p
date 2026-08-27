@@ -1,10 +1,10 @@
-import { webRTCDirect } from '@libp2p/webrtc'
 import { webSockets } from '@libp2p/websockets'
 import { multiaddr } from '@multiformats/multiaddr'
-import type { Stream, StreamCloseEvent, StreamMessageEvent } from '@libp2p/interface'
 import { authenticateConnection, createHost } from 'bitcoin-libp2p/libp2p'
-import { bytesToHex, type PeerRecordInput } from 'bitcoin-libp2p/identity'
+import { bytesToHex, hexToBytes, type PeerRecordInput } from 'bitcoin-libp2p/identity'
 import type { TypedSigner } from 'bitcoin-libp2p/signer'
+import { createWebRTCDirectDialer, dialAuthenticatedWebRTCDirect, parseWebRTCDirectEndpoint } from 'bitcoin-libp2p/webrtc-direct'
+import { readStreamToEnd } from 'bitcoin-libp2p/stream'
 
 const PROTOCOL = '/bitcoin-libp2p/demo/hello/1.0.0'
 
@@ -147,9 +147,11 @@ async function main (): Promise<void> {
   const parameters = new URLSearchParams(location.search)
   const address = parameters.get('addr')
   const transportName = parameters.get('transport') ?? 'websocket'
+  const expectedPublicKeyValue = parameters.get('expected-public-key')
   const failureMode = parseFailureMode(parameters.get('failure'))
   if (address == null) throw new Error('browser Hello requires an addr query parameter')
   if (transportName !== 'websocket' && transportName !== 'webrtc-direct') throw new Error('unsupported browser transport')
+  if (transportName === 'webrtc-direct' && expectedPublicKeyValue == null) throw new Error('WebRTC Direct requires an independent expected-public-key query parameter')
 
   const signer = new WorkerSigner(failureMode === 'worker-exit' ? 'exit' : failureMode == null ? 'normal' : 'pending')
   let node: Awaited<ReturnType<typeof createHost>> | undefined
@@ -159,14 +161,20 @@ async function main (): Promise<void> {
   let stopTimer: number | undefined
   try {
     await signer.ready()
-    node = await createHost({
-      signer,
-      transports: [transportName === 'websocket' ? webSockets() : webRTCDirect()],
-      signTimeoutMs: failureMode === 'pending' ? 500 : undefined,
-      // The local example intentionally permits loopback dialing. Production
-      // applications should retain their normal connection-gater policy.
-      connectionGater: { denyDialMultiaddr: async () => false }
-    })
+    // The local example intentionally permits loopback dialing. Production
+    // applications should retain their normal connection-gater policy.
+    node = transportName === 'webrtc-direct'
+      ? await createWebRTCDirectDialer({
+          signer,
+          signTimeoutMs: failureMode === 'pending' ? 500 : undefined,
+          connectionGater: { denyDialMultiaddr: async () => false }
+        })
+      : await createHost({
+          signer,
+          transports: [webSockets()],
+          signTimeoutMs: failureMode === 'pending' ? 500 : undefined,
+          connectionGater: { denyDialMultiaddr: async () => false }
+        })
     const remoteAddress = multiaddr(address)
     const dialAbort = new AbortController()
     abortTimer = window.setTimeout(() => dialAbort.abort(new Error('browser dial timed out')), 15_000)
@@ -179,15 +187,28 @@ async function main (): Promise<void> {
         dialAbort.abort(new Error('browser host stopped by test'))
       }, 100)
     }
-    const connection = await node.dial(remoteAddress, { signal: dialAbort.signal })
-    const authenticated = authenticateConnection(connection)
+    let connection
+    let authenticated
+    if (transportName === 'webrtc-direct') {
+      const expectedPublicKey = hexToBytes(expectedPublicKeyValue as string)
+      const result = await dialAuthenticatedWebRTCDirect(node, parseWebRTCDirectEndpoint(remoteAddress, { publicKey: expectedPublicKey }), {
+        publicKey: expectedPublicKey,
+        signal: dialAbort.signal
+      })
+      connection = result.connection
+      authenticated = result.authenticatedPeer
+    } else {
+      connection = await node.dial(remoteAddress, { signal: dialAbort.signal })
+      authenticated = authenticateConnection(connection)
+    }
     const message = 'browser hello'
     let lastResponse = ''
     for (let streamNumber = 0; streamNumber < 2; streamNumber++) {
       const stream = await connection.newStream('/bitcoin-libp2p/demo/hello/1.0.0', { signal: AbortSignal.timeout(15_000) })
+      const responsePromise = readStreamToEnd(stream)
       stream.send(new TextEncoder().encode(message))
       await stream.close()
-      lastResponse = new TextDecoder('utf-8', { fatal: true }).decode(await readAll(stream))
+      lastResponse = new TextDecoder('utf-8', { fatal: true }).decode(await responsePromise)
       if (lastResponse !== `hello, ${message}`) throw new Error('Hello response did not match')
     }
     if (failureMode != null) throw new Error(`browser failure mode ${failureMode} unexpectedly succeeded`)
@@ -224,53 +245,6 @@ function parseFailureMode (value: string | null): 'pending' | 'worker-exit' | 'a
 
 function reasonOf (signal?: AbortSignal): Error {
   return signal?.reason instanceof Error ? signal.reason : new DOMException('The operation was aborted', 'AbortError')
-}
-
-async function readAll (stream: Stream): Promise<Uint8Array> {
-  const chunks: Uint8Array[] = []
-  return await new Promise<Uint8Array>((resolve, reject) => {
-    let settled = false
-    const output = (): Uint8Array => {
-      const result = new Uint8Array(chunks.reduce((size, chunk) => size + chunk.length, 0))
-      let offset = 0
-      for (const chunk of chunks) { result.set(chunk, offset); offset += chunk.length }
-      return result
-    }
-    const cleanup = (): void => {
-      stream.removeEventListener('message', onMessage)
-      stream.removeEventListener('end', onEnd)
-      stream.removeEventListener('remoteCloseWrite', onRemoteCloseWrite)
-      stream.removeEventListener('close', onClose)
-    }
-    const finish = (force = false): void => {
-      if (settled) return
-      if (stream.readBufferLength > 0) { queueMicrotask(() => { finish(force) }); return }
-      if (!force && !stream.readableEnded && stream.remoteWriteStatus !== 'closed') return
-      settled = true
-      cleanup()
-      resolve(output())
-    }
-    const onMessage = (event: StreamMessageEvent): void => {
-      const chunk = event.data
-      chunks.push(chunk instanceof Uint8Array ? chunk : chunk.subarray())
-    }
-    const onEnd = (): void => { finish() }
-    const onRemoteCloseWrite = (): void => { queueMicrotask(() => { finish() }) }
-    const onClose = (event: StreamCloseEvent): void => {
-      if (event.error != null) {
-        settled = true
-        cleanup()
-        reject(event.error)
-        return
-      }
-      finish(true)
-    }
-    stream.addEventListener('message', onMessage)
-    stream.addEventListener('end', onEnd)
-    stream.addEventListener('remoteCloseWrite', onRemoteCloseWrite)
-    stream.addEventListener('close', onClose)
-    queueMicrotask(() => { finish() })
-  })
 }
 
 function publish (status: string, fields: Record<string, string>): void {

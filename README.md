@@ -14,6 +14,12 @@ Protocol ID，也可以直接握手与通信。
 - [V1 SDK 一次性施工单](施工单/20260826/001-bitcoin-libp2p-v1-sdk一次性施工单.md)
 - [V1 审计整改施工单](施工单/20260826/002-bitcoin-libp2p-v1-审计整改施工单.md)
 
+V1.1 已实现 Stream 和 WebRTC Direct 的 SDK 封装，当前作为目标版本 `0.2.0` 的新增公开 API；
+`0.2.0` 尚未发布：
+
+- [V1.1 Stream 与 WebRTC Direct SDK 扩展需求](docs/bitcoin-libp2p-v1.1-stream-webrtc-direct-需求文档.md)
+- [004 Stream 与 WebRTC Direct SDK 施工单](施工单/20260827/004-bitcoin-libp2p-stream-webrtc-direct-sdk施工单.md)
+
 ## 可运行 Demo
 
 从 [examples/README.md](examples/README.md) 开始可在约五分钟内跑通 Go 或 TypeScript Hello，
@@ -34,11 +40,12 @@ Go SDK 的模块路径为 `github.com/bsv8/bitcoin-libp2p`，TypeScript 包名�
 `bitcoin-libp2p`。两端都采用私钥分离模型：SDK 只取得业务公钥和两个
 受限的 typed 签名能力，不负责保存、传输或管理业务私钥。
 
-当前双语言版本为 `0.1.0`：
+当前双语言目标版本为 `0.2.0`（仅本地验收版本，尚未发布）：
 
 ```text
-go get github.com/bsv8/bitcoin-libp2p@v0.1.0
-npm install bitcoin-libp2p@0.1.0
+# 发布后再安装：
+go get github.com/bsv8/bitcoin-libp2p@v0.2.0
+npm install bitcoin-libp2p@0.2.0
 ```
 
 版本清单、发布门禁和发布顺序见 [双语言发布说明](release/README.md)。
@@ -61,8 +68,9 @@ Yamux；`Raw/raw` 明确不可提取，签名结果在交给上游前以绑定�
 加密与握手，业务 secp256k1 key 只作为长期身份和受限身份签名 authority，不承载钱包、
 交易或业务消息签名。
 
-已支持：secp256k1 identity、标准 TCP/WebSocket/可注入 transport、标准 Noise/Yamux/
-Identify、Signed Peer Record、authenticated remote public key 与 pin。未支持且有意留在
+已支持：secp256k1 identity、标准 TCP/WebSocket/可注入 transport、浏览器 WebRTC Direct
+出站拨号、严格 endpoint/certhash 校验、有界 Stream 读取、标准 Noise/Yamux/Identify、
+Signed Peer Record、authenticated remote public key 与 pin。未支持且有意留在
 调用方：Worker leader/session/lease、Vault/HSM/gRPC 协议、业务 envelope、钱包和交易签名。
 
 普通测试与跨进程测试分离：
@@ -71,9 +79,10 @@ Identify、Signed Peer Record、authenticated remote public key 与 pin。未支
 go test ./...
 (cd typescript && npm test)
 ./scripts/test-integration.sh
-(cd typescript && npx playwright install chromium) # 首次或 Playwright 升级后
-./scripts/test-browser-integration.sh
-(cd typescript && npm pack --dry-run)              # 发布前检查正式 tarball
+./scripts/test-browser-integration.sh                 # acceptance：WebSocket/Direct 各至少 20 次 + 负向矩阵
+./scripts/test-demos.sh --all
+(cd typescript && npm pack --dry-run)                 # 发布前检查正式 tarball
+make release-check
 ```
 
 前两项离线且不会启动长期服务；中间两项是显式集成入口，使用本机随机端口和测试 key；

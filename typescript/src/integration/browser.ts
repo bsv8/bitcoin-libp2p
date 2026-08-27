@@ -1,14 +1,17 @@
 // Browser integration entrypoint. Build this file separately and load it in a
 // real Chromium Window; it is not imported by the SDK or ordinary tests.
-import { webRTCDirect } from '@libp2p/webrtc'
 import { webSockets } from '@libp2p/websockets'
 import { multiaddr } from '@multiformats/multiaddr'
 import { authenticateConnection, createHost } from '../libp2p/index.js'
 import { bytesToHex, hexToBytes, type PeerRecordInput } from '../identity/index.js'
+import { readStreamToEnd } from '../stream/index.js'
+import { createWebRTCDirectDialer, dialAuthenticatedWebRTCDirect, parseWebRTCDirectEndpoint } from '../webrtc-direct/index.js'
 import type { TypedSigner } from '../signer/index.js'
 
 const PROTOCOL = '/bitcoin-libp2p/test/echo/1.0.0'
+const RESET_PROTOCOL = '/bitcoin-libp2p/test/reset/1.0.0'
 const TEST_ONLY_PUBLIC_KEY = '0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798'
+const TEST_ONLY_REMOTE_PUBLIC_KEY = '02e940822d4e7a09ce013bed4fa812e92f22b0ed1fa2d1ad06ae0406680da1cc46'
 
 interface PeerRecordWire {
   peerIdPublicKey: Uint8Array
@@ -16,7 +19,7 @@ interface PeerRecordWire {
   sequence: bigint
 }
 
-type FailureScenario = 'pending' | 'exit' | 'stop' | undefined
+type FailureScenario = 'pending' | 'exit' | 'stop' | 'wrong-port' | 'wrong-certhash' | 'wrong-address-peer-id' | 'wrong-public-key' | 'abort' | 'dns-localhost' | 'dns-unavailable' | 'old-certhash' | 'stream-reset' | undefined
 
 class WorkerSigner implements TypedSigner {
   readonly #worker: Worker
@@ -107,18 +110,6 @@ class WorkerSigner implements TypedSigner {
   }
 }
 
-async function readAll (stream: AsyncIterable<Uint8Array | { subarray (): Uint8Array }>): Promise<Uint8Array> {
-  const chunks: Uint8Array[] = []
-  for await (const chunk of stream) chunks.push(chunk instanceof Uint8Array ? chunk : chunk.subarray())
-  const result = new Uint8Array(chunks.reduce((length, chunk) => length + chunk.length, 0))
-  let offset = 0
-  for (const chunk of chunks) {
-    result.set(chunk, offset)
-    offset += chunk.length
-  }
-  return result
-}
-
 function equalBytes (left: Uint8Array, right: Uint8Array): boolean {
   return left.length === right.length && left.every((byte, index) => byte === right[index])
 }
@@ -142,24 +133,33 @@ async function main (): Promise<void> {
   const address = params.get('addr')
   const transportName = params.get('transport') ?? 'websocket'
   const failureValue = params.get('failure')
-  const failure = failureValue === null ? undefined : failureValue as FailureScenario
+  const failure = parseFailure(failureValue)
   if (address == null) throw new Error('browser integration requires ?addr=')
   if (transportName !== 'websocket' && transportName !== 'webrtc-direct') throw new Error('unsupported browser transport')
-  if (failure !== undefined && failure !== 'pending' && failure !== 'exit' && failure !== 'stop') throw new Error('unsupported browser failure scenario')
+  const directFailure = transportName === 'webrtc-direct' && isDirectDialFailure(failure)
+  if (failure != null && transportName === 'websocket' && failure !== 'pending' && failure !== 'exit' && failure !== 'stop') {
+    throw new Error('unsupported WebSocket failure scenario')
+  }
 
   const signer = new WorkerSigner(failure)
-  const node = await createHost({
-    signer,
-    transports: [transportName === 'websocket' ? webSockets() : webRTCDirect()],
-    // This test deliberately dials the local Go endpoint over loopback and
-    // insecure ws. Production callers should keep the browser default gater.
-    connectionGater: { denyDialMultiaddr: async () => false },
-    signTimeoutMs: failure == null ? undefined : 300
-  })
+  // This test deliberately dials the local Go endpoint over loopback and
+  // insecure ws. Production callers should keep the browser default gater.
+  const node = transportName === 'webrtc-direct'
+    ? await createWebRTCDirectDialer({
+        signer,
+        connectionGater: { denyDialMultiaddr: async () => false },
+        signTimeoutMs: failure == null ? undefined : 300
+      })
+    : await createHost({
+        signer,
+        transports: [webSockets()],
+        connectionGater: { denyDialMultiaddr: async () => false },
+        signTimeoutMs: failure == null ? undefined : 300
+      })
   try {
     const remoteAddress = multiaddr(address)
-    const dial = node.dial(remoteAddress, { signal: AbortSignal.timeout(failure == null ? 15_000 : 5_000) })
-    if (failure != null) {
+    if (failure != null && !directFailure && failure !== 'dns-localhost' && failure !== 'stream-reset') {
+      const dial = node.dial(remoteAddress, { signal: AbortSignal.timeout(5_000) })
       if (failure === 'stop') {
         await new Promise(resolve => setTimeout(resolve, 50))
         await node.stop()
@@ -174,18 +174,82 @@ async function main (): Promise<void> {
       publish('PASS_FAILURE', { scenario: failure, pendingSigners: String(signer.pendingCount) })
       return
     }
-    const connection = await dial
-    const authenticated = authenticateConnection(connection)
+    let connection
+    let authenticated
+    let directEndpoint
+    if (transportName === 'webrtc-direct') {
+      const expectedPublicKey = hexToBytes(failure === 'wrong-public-key' ? TEST_ONLY_PUBLIC_KEY : TEST_ONLY_REMOTE_PUBLIC_KEY)
+      const endpointAddress = failure != null ? alterDirectAddress(remoteAddress, failure) : remoteAddress
+      const controller = new AbortController()
+      const abortTimer = failure === 'abort' ? setTimeout(() => { controller.abort(new Error('test caller abort')) }, 10) : undefined
+      try {
+        const endpoint = parseWebRTCDirectEndpoint(endpointAddress, { publicKey: expectedPublicKey })
+        directEndpoint = endpoint
+        const result = await dialAuthenticatedWebRTCDirect(node, endpoint, {
+          publicKey: expectedPublicKey,
+          signal: controller.signal,
+          resolver: async ({ host, hostType }) => {
+            if (failure === 'dns-localhost' && host === 'localhost' && hostType === 'dns4') {
+              return { hostType: 'ip4', host: '127.0.0.1' }
+            }
+            throw new Error(`test DNS resolver has no result for ${hostType}/${host}`)
+          }
+        })
+        connection = result.connection
+        authenticated = result.authenticatedPeer
+        directEndpoint = result.endpoint
+      } catch (error) {
+        if (!directFailure) throw error
+        publish('PASS_FAILURE', {
+          scenario: failure,
+          errorCode: stableErrorField(error, 'code'),
+          errorStage: stableErrorField(error, 'stage'),
+          pendingSigners: String(signer.pendingCount)
+        })
+        return
+      } finally {
+        if (abortTimer != null) clearTimeout(abortTimer)
+      }
+      if (directFailure) throw new Error(`direct failure scenario ${failure} unexpectedly succeeded`)
+    } else {
+      connection = await node.dial(remoteAddress, { signal: AbortSignal.timeout(15_000) })
+      authenticated = authenticateConnection(connection)
+    }
+    if (failure === 'stream-reset') {
+      const stream = await connection.newStream(RESET_PROTOCOL, { signal: AbortSignal.timeout(15_000) })
+      const responsePromise = readStreamToEnd(stream, { timeoutMs: 15_000 })
+      try {
+        await responsePromise
+        throw new Error('stream reset scenario unexpectedly reached EOF')
+      } catch (error) {
+        if (error instanceof Error && error.message === 'stream reset scenario unexpectedly reached EOF') throw error
+        publish('PASS_FAILURE', {
+          scenario: failure,
+          errorCode: stableErrorField(error, 'code'),
+          errorStage: 'stream',
+          pendingSigners: String(signer.pendingCount)
+        })
+        return
+      }
+    }
     for (const data of [new TextEncoder().encode('browser-hello'), payload(128 * 1024)]) {
       const stream = await connection.newStream(PROTOCOL, { signal: AbortSignal.timeout(15_000) })
+      const responsePromise = readStreamToEnd(stream)
       stream.send(data)
       await stream.close()
-      const response = await readAll(stream)
+      const response = await responsePromise
       if (!equalBytes(data, response)) throw new Error('browser echo response did not match')
     }
     publish('PASS', {
       peerId: authenticated.peerId.toString(),
       publicKey: bytesToHex(authenticated.publicKey),
+      ...(directEndpoint == null ? {} : {
+        endpointAddress: directEndpoint.address.toString(),
+        endpointHost: directEndpoint.host,
+        endpointPort: String(directEndpoint.udpPort),
+        endpointCerthash: directEndpoint.certhash,
+        endpointPeerId: directEndpoint.peerId.toString()
+      }),
       noiseRequests: String(signer.noiseRequests),
       streams: '2',
       pendingSigners: String(signer.pendingCount)
@@ -200,3 +264,40 @@ void main().catch(error => {
   const message = error instanceof Error ? error.message : 'browser integration failed'
   publish('FAIL', { error: message })
 })
+
+function parseFailure (value: string | null): FailureScenario {
+  if (value == null) return undefined
+  if (value === 'pending' || value === 'exit' || value === 'stop' || value === 'wrong-port' || value === 'wrong-certhash' || value === 'wrong-address-peer-id' || value === 'wrong-public-key' || value === 'abort' || value === 'dns-localhost' || value === 'dns-unavailable' || value === 'old-certhash' || value === 'stream-reset') return value
+  throw new Error('unsupported browser failure scenario')
+}
+
+function isDirectDialFailure (failure: FailureScenario): failure is Exclude<FailureScenario, undefined> {
+  return failure === 'wrong-port' || failure === 'wrong-certhash' || failure === 'wrong-address-peer-id' || failure === 'wrong-public-key' || failure === 'abort' || failure === 'dns-unavailable' || failure === 'old-certhash'
+}
+
+function alterDirectAddress (address: ReturnType<typeof multiaddr>, failure: Exclude<FailureScenario, undefined>): ReturnType<typeof multiaddr> {
+  const endpoint = parseWebRTCDirectEndpoint(address)
+  let value = endpoint.address.toString()
+  if (failure === 'wrong-port') {
+    const port = endpoint.udpPort === 65535 ? 65534 : endpoint.udpPort + 1
+    value = value.replace(`/udp/${endpoint.udpPort}/`, `/udp/${port}/`)
+  } else if (failure === 'wrong-certhash') {
+    const replacement = endpoint.certhash.slice(0, -1) + (endpoint.certhash.endsWith('w') ? 'x' : 'w')
+    value = value.replace(endpoint.certhash, replacement)
+  } else if (failure === 'wrong-address-peer-id') {
+    value = value.replace(endpoint.peerId.toString(), '16Uiu2HAm3cuhhRL2msUuLF62KRSfneFDx94RsuouyW25Ho42cFMq')
+  } else if (failure === 'dns-localhost') {
+    value = value.replace(`/ip4/${endpoint.host}/`, '/dns4/localhost/')
+  } else if (failure === 'dns-unavailable') {
+    value = value.replace(`/ip4/${endpoint.host}/`, '/dns4/does-not-exist.invalid/')
+  }
+  return multiaddr(value)
+}
+
+function stableErrorField (value: unknown, field: 'code' | 'stage'): string {
+  if (typeof value === 'object' && value != null && field in value) {
+    const fieldValue = (value as Record<string, unknown>)[field]
+    if (typeof fieldValue === 'string') return fieldValue
+  }
+  return 'UNKNOWN'
+}

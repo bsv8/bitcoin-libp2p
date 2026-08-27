@@ -12,11 +12,14 @@ import (
 	"time"
 
 	libp2p "github.com/libp2p/go-libp2p"
+	"github.com/libp2p/go-libp2p/core/connmgr"
 	libp2pcrypto "github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/pnet"
 	"github.com/libp2p/go-libp2p/core/protocol"
+	libp2ptransport "github.com/libp2p/go-libp2p/core/transport"
 	"github.com/libp2p/go-libp2p/p2p/muxer/yamux"
 	"github.com/libp2p/go-libp2p/p2p/security/noise"
 	libp2pwebrtc "github.com/libp2p/go-libp2p/p2p/transport/webrtc"
@@ -31,6 +34,7 @@ func main() {
 	address := flag.String("addr", "", "peer multiaddr for client mode")
 	keyHex := flag.String("key", defaultKey, "TEST-ONLY private key; never printed")
 	transportName := flag.String("transport", "tcp", "tcp, websocket, or webrtc-direct")
+	rotateCert := flag.Bool("rotate-cert", false, "TEST-ONLY: derive a different WebRTC certificate while retaining the host identity")
 	flag.Parse()
 	raw, err := hex.DecodeString(*keyHex)
 	if err != nil {
@@ -52,7 +56,11 @@ func main() {
 		options = append(options, libp2p.Transport(libp2pwebsocket.New))
 	case "webrtc-direct":
 		listenValue = "/ip4/127.0.0.1/udp/0/webrtc-direct"
-		options = append(options, libp2p.Transport(libp2pwebrtc.New))
+		if *rotateCert {
+			options = append(options, libp2p.Transport(rotatedWebRTCTransport))
+		} else {
+			options = append(options, libp2p.Transport(libp2pwebrtc.New))
+		}
 	case "tcp":
 		// The default libp2p transport set includes TCP.
 	default:
@@ -113,9 +121,29 @@ func main() {
 	fmt.Printf("OK %s %s %s\n", info.ID, hex.EncodeToString(remotePublicKey), info.ID)
 }
 
+// certificateOnlyKey is used only by the acceptance server to model a
+// certificate rotation. Sign/GetPublic still delegate to the host identity;
+// only Raw, which go-libp2p WebRTC uses to derive its DTLS certificate, is
+// replaced. This keeps PeerId and Noise identity unchanged across rotation.
+type certificateOnlyKey struct {
+	libp2pcrypto.PrivKey
+	raw []byte
+}
+
+func (key *certificateOnlyKey) Raw() ([]byte, error) {
+	return append([]byte(nil), key.raw...), nil
+}
+
+func rotatedWebRTCTransport(privKey libp2pcrypto.PrivKey, psk pnet.PSK, gater connmgr.ConnectionGater, rcmgr network.ResourceManager, listenUDP libp2pwebrtc.ListenUDPFn) (libp2ptransport.Transport, error) {
+	rotatedRaw := make([]byte, 32)
+	rotatedRaw[31] = 2
+	return libp2pwebrtc.New(&certificateOnlyKey{PrivKey: privKey, raw: rotatedRaw}, psk, gater, rcmgr, listenUDP)
+}
+
 const (
-	echoProtocol = protocol.ID("/bitcoin-libp2p/test/echo/1.0.0")
-	maxEcho      = 1 << 20
+	echoProtocol  = protocol.ID("/bitcoin-libp2p/test/echo/1.0.0")
+	resetProtocol = protocol.ID("/bitcoin-libp2p/test/reset/1.0.0")
+	maxEcho       = 1 << 20
 )
 
 func installEcho(h host.Host) {
@@ -130,6 +158,11 @@ func installEcho(h host.Host) {
 			_, _ = stream.Write(payload)
 			_ = stream.CloseWrite()
 		}()
+	})
+	h.SetStreamHandler(resetProtocol, func(stream network.Stream) {
+		// This test-only protocol gives A10 a deterministic, real Go reset
+		// without depending on a large write or a muxer buffer race.
+		_ = stream.Reset()
 	})
 }
 

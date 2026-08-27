@@ -4,6 +4,7 @@ import { tcp } from '@libp2p/tcp'
 import { multiaddr } from '@multiformats/multiaddr'
 import { createHost } from '../libp2p/index.js'
 import { hexToBytes } from '../identity/index.js'
+import { readStreamToEnd } from '../stream/index.js'
 import { RemoteSigner } from './remote-signer.js'
 
 const PROTOCOL = '/bitcoin-libp2p/test/echo/1.0.0'
@@ -21,20 +22,6 @@ function payload (size: number): Uint8Array {
 
 function equalBytes (a: Uint8Array, b: Uint8Array): boolean {
   return a.length === b.length && a.every((value, index) => value === b[index])
-}
-
-async function readAll (stream: AsyncIterable<Uint8Array | { subarray (): Uint8Array }>): Promise<Uint8Array> {
-  const parts: Uint8Array[] = []
-  for await (const part of stream) {
-    parts.push(part instanceof Uint8Array ? part : part.subarray())
-  }
-  const result = new Uint8Array(parts.reduce((size, part) => size + part.length, 0))
-  let offset = 0
-  for (const part of parts) {
-    result.set(part, offset)
-    offset += part.length
-  }
-  return result
 }
 
 async function main (): Promise<void> {
@@ -62,7 +49,7 @@ async function main (): Promise<void> {
 
   if (mode === 'server') {
     await node.handle(PROTOCOL, async stream => {
-      const input = await readAll(stream)
+      const input = await readStreamToEnd(stream)
       if (input.length === 0 || input.length > 1 << 20) {
         stream.abort(new Error('invalid echo payload'))
         return
@@ -84,9 +71,10 @@ async function main (): Promise<void> {
   const connection = await node.dial(remoteAddress, { signal: AbortSignal.timeout(10_000) })
   for (const data of [new TextEncoder().encode('hello'), payload(128 * 1024)]) {
     const stream = await connection.newStream(PROTOCOL, { signal: AbortSignal.timeout(10_000) })
+    const responsePromise = readStreamToEnd(stream)
     stream.send(data)
     await stream.close()
-    const response = await readAll(stream)
+    const response = await responsePromise
     if (!equalBytes(data, response)) throw new Error('echo response did not match')
   }
   const authenticated = connection.remotePeer

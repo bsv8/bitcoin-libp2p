@@ -1,6 +1,6 @@
 {
   "name": "bitcoin-libp2p",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "license": "AGPL-3.0-only",
   "description": "Standard libp2p secp256k1 identity with a typed remote-signer boundary",
   "type": "module",
@@ -20,6 +20,14 @@
     "./libp2p": {
       "types": "./dist/libp2p/index.d.ts",
       "import": "./dist/libp2p/index.js"
+    },
+    "./stream": {
+      "types": "./dist/stream/index.d.ts",
+      "import": "./dist/stream/index.js"
+    },
+    "./webrtc-direct": {
+      "types": "./dist/webrtc-direct/index.d.ts",
+      "import": "./dist/webrtc-direct/index.js"
     }
   },
   "files": [
@@ -31,7 +39,9 @@
     "dist/index.d.ts.map",
     "dist/identity",
     "dist/signer",
-    "dist/libp2p"
+    "dist/libp2p",
+    "dist/stream",
+    "dist/webrtc-direct"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
@@ -50,19 +60,20 @@
     "@libp2p/peer-id": "6.0.15",
     "@libp2p/peer-id-factory": "4.2.4",
     "@libp2p/peer-record": "9.0.16",
+    "@libp2p/webrtc": "6.0.30",
     "@libp2p/websockets": "10.1.20",
     "@multiformats/multiaddr": "13.0.3",
     "@noble/curves": "2.0.1",
     "@noble/hashes": "2.0.1",
-    "libp2p": "3.3.9"
+    "libp2p": "3.3.9",
+    "multiformats": "14.0.5"
   },
   "devDependencies": {
-    "@playwright/test": "1.51.1",
     "@libp2p/tcp": "11.0.27",
-    "@libp2p/webrtc": "6.0.30",
-    "@types/node": "22.10.2",
+    "@playwright/test": "1.62.1",
+    "@types/node": "22.20.1",
     "esbuild": "0.28.2",
     "typescript": "5.7.2",
-    "vitest": "2.1.8"
+    "vitest": "4.1.11"
   }
 }

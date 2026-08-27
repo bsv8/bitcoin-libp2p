@@ -344,6 +344,9 @@ async function runBrowserScenario (transport, nativeServerBinary, httpServer, fa
     const browserURL = new URL(httpServer.url)
     browserURL.searchParams.set('transport', transport)
     browserURL.searchParams.set('addr', ready.address)
+    // WebRTC Direct must receive an identity pin independently of the
+    // address. The runner obtains it from the server's separate ready event.
+    browserURL.searchParams.set('expected-public-key', ready.publicKey)
     if (failure != null) browserURL.searchParams.set('failure', failure)
     const { chromium } = playwright()
     try {
