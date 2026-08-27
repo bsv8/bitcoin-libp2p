@@ -6,9 +6,9 @@ import { fileURLToPath } from 'node:url'
 import type { Stream, StreamCloseEvent, StreamMessageEvent } from '@libp2p/interface'
 import { tcp } from '@libp2p/tcp'
 import { multiaddr } from '@multiformats/multiaddr'
-import { authenticateConnection, createHost } from '@bsv8/bitcoin-libp2p/libp2p'
-import { peerIdFromPublicKeyBytes, peerRecordUnsigned, type PeerRecordInput } from '@bsv8/bitcoin-libp2p/identity'
-import type { TypedSigner } from '@bsv8/bitcoin-libp2p/signer'
+import { authenticateConnection, createHost } from 'bitcoin-libp2p/libp2p'
+import { peerIdFromPublicKeyBytes, peerRecordUnsigned, type PeerRecordInput } from 'bitcoin-libp2p/identity'
+import type { TypedSigner } from 'bitcoin-libp2p/signer'
 
 const PROTOCOL = '/bitcoin-libp2p/demo/hello/1.0.0'
 const MAX_MESSAGE = 1 << 10

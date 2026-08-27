@@ -3,8 +3,8 @@
 // The raw test key is generated in this dedicated Worker. It is never sent to
 // the Window, placed in the DOM, or included in a signer request.
 import { multiaddr } from '@multiformats/multiaddr'
-import { peerIdFromPublicKeyBytes, type PeerRecordInput } from '@bsv8/bitcoin-libp2p/identity'
-import { LocalSigner } from '@bsv8/bitcoin-libp2p/signer'
+import { peerIdFromPublicKeyBytes, type PeerRecordInput } from 'bitcoin-libp2p/identity'
+import { LocalSigner } from 'bitcoin-libp2p/signer'
 
 type Request =
   | { id: number, purpose: 'noise-static-key', staticKey: Uint8Array }

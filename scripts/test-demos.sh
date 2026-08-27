@@ -39,7 +39,7 @@ browser_dir="$repo_dir/examples/05-browser-worker-hello"
 native_ts_dir="$repo_dir/examples/06-native-interop/native-typescript"
 
 require_demo_dependency "$ts_hello_dir" "TypeScript Hello"
-if [[ ! -d "$ts_hello_dir/node_modules/@bsv8/bitcoin-libp2p/dist" ]]; then
+if [[ ! -d "$ts_hello_dir/node_modules/bitcoin-libp2p/dist" ]]; then
   echo "TypeScript Hello does not have the built SDK dependency. Run: npm ci --prefix $ts_hello_dir" >&2
   exit 2
 fi
@@ -109,7 +109,7 @@ if ! npm install --offline --prefix "$sdk_consumer_dir" --no-save --package-lock
   echo "offline SDK tarball consumption failed; run the README dependency preparation first" >&2
   exit 1
 fi
-(cd "$sdk_consumer_dir" && node --input-type=module --eval "const sdk = await import('@bsv8/bitcoin-libp2p'); if (typeof sdk.createHost !== 'function') throw new Error('formal SDK tarball has no createHost export')")
+(cd "$sdk_consumer_dir" && node --input-type=module --eval "const sdk = await import('bitcoin-libp2p'); if (typeof sdk.createHost !== 'function') throw new Error('formal SDK tarball has no createHost export')")
 
 runner_status=0
 node examples/e2e/runner.mjs --all --build-dir "$build_dir" --sdk-tarball "$sdk_tarball" || runner_status=$?

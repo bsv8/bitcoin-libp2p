@@ -83,7 +83,7 @@ host 进程只持有绑定公钥和 typed client。测试通道不得接受任�
 - 原生 Go 在自己的 module 内实现最小 echo，不 import/link 主 module 的 `integration/echo`；
 - 原生 TypeScript entry 不 import SDK source、dist 或 package export；
 - 用依赖图检查证明原生端不存在 `github.com/bsv8/bitcoin-libp2p` 或
-  `@bsv8/bitcoin-libp2p` 依赖；
+  `bitcoin-libp2p` 依赖；
 - 保留 v0.45 独立 module，不把它并回主 module。
 
 ### 3.2 矩阵方向

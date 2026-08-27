@@ -7,7 +7,7 @@
 ```text
 Go SDK client → standard Noise/Yamux/TCP → independent native TypeScript server
 TypeScript SDK client → standard Noise/Yamux/TCP → independent native Go server
-native-typescript/package.json 与 server/go.mod 都不引用 @bsv8/bitcoin-libp2p。
+native-typescript/package.json 与 server/go.mod 都不引用 bitcoin-libp2p。
 ```
 
 ## 前置环境

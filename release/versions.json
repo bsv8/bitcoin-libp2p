@@ -7,7 +7,7 @@
   },
   "packages": {
     "npm": {
-      "name": "@bsv8/bitcoin-libp2p",
+      "name": "bitcoin-libp2p",
       "version": "0.1.0"
     },
     "go": {

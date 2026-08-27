@@ -1,5 +1,5 @@
 {
-  "name": "@bsv8/bitcoin-libp2p",
+  "name": "bitcoin-libp2p",
   "version": "0.1.0",
   "license": "AGPL-3.0-only",
   "description": "Standard libp2p secp256k1 identity with a typed remote-signer boundary",

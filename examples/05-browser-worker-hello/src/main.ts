@@ -2,9 +2,9 @@ import { webRTCDirect } from '@libp2p/webrtc'
 import { webSockets } from '@libp2p/websockets'
 import { multiaddr } from '@multiformats/multiaddr'
 import type { Stream, StreamCloseEvent, StreamMessageEvent } from '@libp2p/interface'
-import { authenticateConnection, createHost } from '@bsv8/bitcoin-libp2p/libp2p'
-import { bytesToHex, type PeerRecordInput } from '@bsv8/bitcoin-libp2p/identity'
-import type { TypedSigner } from '@bsv8/bitcoin-libp2p/signer'
+import { authenticateConnection, createHost } from 'bitcoin-libp2p/libp2p'
+import { bytesToHex, type PeerRecordInput } from 'bitcoin-libp2p/identity'
+import type { TypedSigner } from 'bitcoin-libp2p/signer'
 
 const PROTOCOL = '/bitcoin-libp2p/demo/hello/1.0.0'
 

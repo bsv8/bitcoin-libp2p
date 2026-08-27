@@ -1,7 +1,7 @@
-# @bsv8/bitcoin-libp2p
+# bitcoin-libp2p
 
 ```text
-npm install @bsv8/bitcoin-libp2p@0.1.0
+npm install bitcoin-libp2p@0.1.0
 ```
 
 Standard libp2p secp256k1 identity for TypeScript with a non-extractable

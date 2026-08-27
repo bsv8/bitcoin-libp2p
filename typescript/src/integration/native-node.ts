@@ -1,5 +1,5 @@
 // Native TypeScript interoperability endpoint. This file intentionally does
-// not import @bsv8/bitcoin-libp2p.
+// not import bitcoin-libp2p.
 import { privateKeyFromProtobuf } from '@libp2p/crypto/keys'
 import { identify, identifyPush } from '@libp2p/identify'
 import { tcp } from '@libp2p/tcp'

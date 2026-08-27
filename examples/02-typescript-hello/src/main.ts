@@ -5,9 +5,9 @@ import { createInterface } from 'node:readline'
 import type { Stream, StreamCloseEvent, StreamMessageEvent } from '@libp2p/interface'
 import { tcp } from '@libp2p/tcp'
 import { multiaddr, type Multiaddr } from '@multiformats/multiaddr'
-import { authenticateConnection, createHost } from '@bsv8/bitcoin-libp2p/libp2p'
-import { bytesToHex, hexToBytes, validatePublicKey } from '@bsv8/bitcoin-libp2p/identity'
-import { LocalSigner } from '@bsv8/bitcoin-libp2p/signer'
+import { authenticateConnection, createHost } from 'bitcoin-libp2p/libp2p'
+import { bytesToHex, hexToBytes, validatePublicKey } from 'bitcoin-libp2p/identity'
+import { LocalSigner } from 'bitcoin-libp2p/signer'
 
 const PROTOCOL = '/bitcoin-libp2p/demo/hello/1.0.0'
 const MAX_MESSAGE = 1 << 10

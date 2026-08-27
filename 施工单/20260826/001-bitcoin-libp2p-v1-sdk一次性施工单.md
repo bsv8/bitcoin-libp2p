@@ -98,7 +98,7 @@ github.com/bsv8/bitcoin-libp2p
 TypeScript 包名在施工时固定为：
 
 ```text
-@bsv8/bitcoin-libp2p
+bitcoin-libp2p
 ```
 
 不再增加第二个同义包或兼容别名。

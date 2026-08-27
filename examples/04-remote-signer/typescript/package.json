@@ -7,7 +7,7 @@
     "start": "node dist/host.js"
   },
   "dependencies": {
-    "@bsv8/bitcoin-libp2p": "file:../../../typescript",
+    "bitcoin-libp2p": "file:../../../typescript",
     "@libp2p/tcp": "11.0.27",
     "@multiformats/multiaddr": "13.0.3"
   },

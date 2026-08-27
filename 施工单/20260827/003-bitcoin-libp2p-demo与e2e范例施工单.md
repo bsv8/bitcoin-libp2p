@@ -260,7 +260,7 @@ scripts/
 
 ### 7.2 消费者真实性
 
-- 源码必须按包名 `@bsv8/bitcoin-libp2p` 及公开 subpath import；
+- 源码必须按包名 `bitcoin-libp2p` 及公开 subpath import；
 - 不得 import `../../typescript/src`、`dist` 内部文件或 integration endpoint；
 - 本仓库人工运行可通过 `file:../../typescript` 安装已构建包；
 - E2E 必须优先从 `npm pack` 产生的正式 tarball 安装，顺带证明公开 exports 和声明可消费；
@@ -390,7 +390,7 @@ cd typescript && npx playwright install chromium
 
 - 原生 Go server：复用 Demo 05 的独立 `server` module，不 import 主 module，并增加/保留 TCP
   运行参数；
-- 原生 TypeScript server：独立 package，不依赖 `@bsv8/bitcoin-libp2p`。
+- 原生 TypeScript server：独立 package，不依赖 `bitcoin-libp2p`。
 
 原生端可使用原生 libp2p 支持的 secp256k1 identity，但不得复制 SDK adapter、typed signer 或
 认证 helper。

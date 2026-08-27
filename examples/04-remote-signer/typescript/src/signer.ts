@@ -3,8 +3,8 @@
 import { randomBytes } from 'node:crypto'
 import { createInterface } from 'node:readline'
 import { multiaddr } from '@multiformats/multiaddr'
-import { LocalSigner, type TypedSigner } from '@bsv8/bitcoin-libp2p/signer'
-import { parsePeerId, type PeerRecordInput } from '@bsv8/bitcoin-libp2p/identity'
+import { LocalSigner, type TypedSigner } from 'bitcoin-libp2p/signer'
+import { parsePeerId, type PeerRecordInput } from 'bitcoin-libp2p/identity'
 
 type Mode = 'normal' | 'pending' | 'exit' | 'reject' | 'wrong-key'
 

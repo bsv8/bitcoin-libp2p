@@ -23,7 +23,7 @@ assert.equal(versions.schemaVersion, 1, 'unsupported release manifest schema')
 assert.equal(versions.protocol.id, 'bitcoin-libp2p')
 assert.equal(versions.protocol.version, 1)
 assert.equal(versions.protocol.goModuleMajor, 0)
-assert.equal(versions.packages.npm.name, '@bsv8/bitcoin-libp2p')
+assert.equal(versions.packages.npm.name, 'bitcoin-libp2p')
 assert.equal(packageJson.name, versions.packages.npm.name)
 assert.equal(packageJson.version, versions.packages.npm.version)
 assert.equal(packageLock.name, packageJson.name)
@@ -107,10 +107,10 @@ try {
   ], { cwd: temporaryDir })
 
   writeFileSync(join(consumerDir, 'runtime.mjs'), `
-import { createHost } from '@bsv8/bitcoin-libp2p'
-import { bytesToHex } from '@bsv8/bitcoin-libp2p/identity'
-import { LocalSigner } from '@bsv8/bitcoin-libp2p/signer'
-import { authenticateConnection } from '@bsv8/bitcoin-libp2p/libp2p'
+import { createHost } from 'bitcoin-libp2p'
+import { bytesToHex } from 'bitcoin-libp2p/identity'
+import { LocalSigner } from 'bitcoin-libp2p/signer'
+import { authenticateConnection } from 'bitcoin-libp2p/libp2p'
 if (typeof createHost !== 'function') throw new Error('root export is unavailable')
 if (typeof bytesToHex !== 'function') throw new Error('identity export is unavailable')
 if (typeof LocalSigner !== 'function') throw new Error('signer export is unavailable')
@@ -119,10 +119,10 @@ if (typeof authenticateConnection !== 'function') throw new Error('libp2p export
   run('node', ['runtime.mjs'], { cwd: consumerDir })
 
   writeFileSync(join(consumerDir, 'consumer.ts'), `
-import { createHost } from '@bsv8/bitcoin-libp2p'
-import { bytesToHex, type BytesLike } from '@bsv8/bitcoin-libp2p/identity'
-import { LocalSigner, type TypedSigner } from '@bsv8/bitcoin-libp2p/signer'
-import { authenticateConnection, type HostConfig } from '@bsv8/bitcoin-libp2p/libp2p'
+import { createHost } from 'bitcoin-libp2p'
+import { bytesToHex, type BytesLike } from 'bitcoin-libp2p/identity'
+import { LocalSigner, type TypedSigner } from 'bitcoin-libp2p/signer'
+import { authenticateConnection, type HostConfig } from 'bitcoin-libp2p/libp2p'
 const bytes: BytesLike = new Uint8Array()
 const signer: TypedSigner = new LocalSigner(new Uint8Array(32).fill(1))
 const config: HostConfig = { signer, start: false }

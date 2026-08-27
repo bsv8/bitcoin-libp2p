@@ -141,7 +141,7 @@ check_native_isolation() {
     echo "native Go v0.45 dependency graph imports the SDK" >&2
     return 1
   fi
-  if rg -n "from ['\"](@bsv8/bitcoin-libp2p|\.\./(identity|signer|libp2p))" typescript/src/integration/native-node.ts; then
+  if rg -n "from ['\"](bitcoin-libp2p|\.\./(identity|signer|libp2p))" typescript/src/integration/native-node.ts; then
     echo "native TypeScript endpoint imports the SDK" >&2
     return 1
   fi

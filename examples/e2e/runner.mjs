@@ -454,9 +454,10 @@ async function startStaticServer () {
 function checkNativeIsolation () {
   const packageFile = JSON.parse(readFileSync(join(paths.nativeTSDir, 'package.json'), 'utf8'))
   const dependencies = { ...(packageFile.dependencies ?? {}), ...(packageFile.devDependencies ?? {}) }
-  if (dependencies['@bsv8/bitcoin-libp2p'] != null) throw new Error('native TypeScript package depends on the SDK')
+  if (dependencies['bitcoin-libp2p'] != null) throw new Error('native TypeScript package depends on the SDK')
   const source = readFileSync(join(paths.nativeTSDir, 'src/main.ts'), 'utf8')
-  if (source.includes('@bsv8/bitcoin-libp2p')) throw new Error('native TypeScript source imports the SDK')
+  const sdkImport = /(?:\bfrom\s+|\bimport\s*(?:\(\s*)?)["']bitcoin-libp2p(?:\/[^"']*)?["']/
+  if (sdkImport.test(source)) throw new Error('native TypeScript source imports the SDK')
   const result = spawnSync('go', ['list', '-deps', '.'], { cwd: paths.nativeGoDir, encoding: 'utf8' })
   if (result.status !== 0) throw new Error(`native Go dependency graph failed: ${result.stderr}`)
   if (/^github\.com\/bsv8\/bitcoin-libp2p(?:$|\/(?:identity|signer|golibp2p))/m.test(result.stdout)) throw new Error('native Go dependency graph imports the SDK')

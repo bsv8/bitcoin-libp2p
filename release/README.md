@@ -2,12 +2,11 @@
 
 `release/versions.json` 是 Go 与 TypeScript 发布版本的唯一清单。当前批次必须同时交付：
 
-- npm：`@bsv8/bitcoin-libp2p@0.1.0`
+- npm：`bitcoin-libp2p@0.1.0`
 - Go：`github.com/bsv8/bitcoin-libp2p@v0.1.0`
 
 Go module 位于仓库根目录，因此使用标准根 tag `v0.1.0`，不能使用
-`go/v0.1.0`。npm 包是 scoped public package，首次及后续发布都应显式使用
-`--access public`。
+`go/v0.1.0`。npm 使用无 scope 的公开包名 `bitcoin-libp2p`。
 
 ## 发布门禁
 
@@ -25,15 +24,15 @@ npm 包。它会验证版本清单、Go module、npm manifest/lockfile、正式 
 正式发布前还必须满足：
 
 1. 工作区干净，发布提交已经推送到远端 `main`。
-2. `npm whoami` 成功，发布账号具有 `@bsv8` scope 的写权限。
-3. npm registry 中不存在 `@bsv8/bitcoin-libp2p@0.1.0`。
+2. `npm whoami` 成功，发布账号可以发布无 scope 包。
+3. npm registry 中不存在 `bitcoin-libp2p@0.1.0`。
 4. 远端不存在 tag `v0.1.0`。
 5. Go 与 TypeScript 按同一批次发布；任一侧不具备条件时不做部分发布。
 
 建议在门禁全部通过后连续执行：
 
 ```text
-(cd typescript && npm publish --access public)
+(cd typescript && npm publish)
 git tag v0.1.0
 git push origin v0.1.0
 ```
@@ -41,7 +40,7 @@ git push origin v0.1.0
 发布后验证：
 
 ```text
-npm view @bsv8/bitcoin-libp2p@0.1.0 version
+npm view bitcoin-libp2p@0.1.0 version
 git ls-remote --tags origin refs/tags/v0.1.0
 GOPROXY=https://proxy.golang.org go list -m github.com/bsv8/bitcoin-libp2p@v0.1.0
 ```
