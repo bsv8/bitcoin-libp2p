@@ -149,3 +149,4 @@ examples/e2e/.output/
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+AGENTS.md
