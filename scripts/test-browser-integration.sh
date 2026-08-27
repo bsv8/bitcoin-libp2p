@@ -5,7 +5,7 @@ repo_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repo_dir"
 
 if [[ ! -x typescript/node_modules/.bin/playwright ]]; then
-  echo "Playwright is not installed. Run: cd typescript && npm install" >&2
+  echo "Playwright is not installed. Run: cd typescript && npm ci" >&2
   exit 2
 fi
 

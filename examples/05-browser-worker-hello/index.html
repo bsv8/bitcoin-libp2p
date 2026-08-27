@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>bitcoin-libp2p Browser Worker Hello</title>
+    <style>
+      body { font: 16px system-ui, sans-serif; max-width: 42rem; margin: 2rem auto; padding: 0 1rem; }
+      dt { color: #555; margin-top: .7rem; } dd { margin: .15rem 0 0; overflow-wrap: anywhere; }
+      [data-status="PASS"] { color: #176b35; } [data-status="FAIL"] { color: #a11; }
+    </style>
+  </head>
+  <body data-status="WAITING">
+    <h1>Browser Worker Hello</h1>
+    <p id="status">Waiting for the browser libp2p host…</p>
+    <dl>
+      <dt>Browser PeerId</dt><dd id="browserPeerId">—</dd>
+      <dt>Browser public key</dt><dd id="browserPublicKey">—</dd>
+      <dt>Go remote PeerId</dt><dd id="remotePeerId">—</dd>
+      <dt>Go remote public key</dt><dd id="remotePublicKey">—</dd>
+      <dt>Transport</dt><dd id="transport">—</dd>
+      <dt>Hello</dt><dd id="request">—</dd>
+      <dt>Response</dt><dd id="response">—</dd>
+      <dt>Signer pending</dt><dd id="pendingSignerRequests">—</dd>
+      <dt>Worker state</dt><dd id="workerState">—</dd>
+    </dl>
+    <script type="module" src="/browser.js"></script>
+  </body>
+</html>

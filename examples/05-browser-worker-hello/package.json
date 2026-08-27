@@ -1,0 +1,20 @@
+{
+  "name": "bitcoin-libp2p-browser-worker-hello-example",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json --noEmit",
+    "build:browser": "esbuild src/main.ts --bundle --format=esm --platform=browser --target=es2022 --outfile=dist/browser.js && esbuild src/signer-worker.ts --bundle --format=esm --platform=browser --target=es2022 --outfile=dist/signer-worker.js"
+  },
+  "dependencies": {
+    "@bsv8/bitcoin-libp2p": "file:../../typescript",
+    "@libp2p/webrtc": "6.0.30",
+    "@libp2p/websockets": "10.1.20",
+    "@multiformats/multiaddr": "13.0.3"
+  },
+  "devDependencies": {
+    "@types/node": "22.10.2",
+    "esbuild": "0.28.2",
+    "typescript": "5.7.2"
+  }
+}

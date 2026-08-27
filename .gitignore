@@ -84,6 +84,13 @@ dist
 /typescript/dist-integration/
 .output
 
+# Developer Demo/E2E build and browser artifacts
+examples/**/dist/
+examples/**/playwright-report/
+examples/**/test-results/
+examples/e2e/.output/
+.demo-build/
+
 # Gatsby files
 .cache/
 # Comment in the public line in if your project uses Gatsby and not Next.js

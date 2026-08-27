@@ -13,6 +13,8 @@ long-running listeners. The explicit integration entry points are:
 ```text
 ./scripts/test-integration.sh
 ./scripts/test-browser-integration.sh
+./scripts/test-demos.sh --quick
+./scripts/test-demos.sh --all
 ```
 
 The first command is reserved for the Go/TypeScript SDK and native libp2p
@@ -23,11 +25,30 @@ a system-installed Chromium executable. Both commands use local random ports,
 bounded timeouts, cleanup traps, and no public network. They are not invoked by
 ordinary tests and are not required CI jobs.
 
+The Demo entry points are a separate developer-facing path:
+
+- [`examples/README.md`](../examples/README.md) is the five-minute Hello path;
+- `--quick` runs the same Go/TypeScript Demo programs in all four Hello
+  combinations and does not start Chromium;
+- `--all` adds the two process-separated signer examples, real Chromium
+  WebSocket/WebRTC Direct, and the independent native Go/TypeScript endpoints.
+
+Prepare the dependencies explicitly before running the Demo entry point; it
+only checks them and does not run `npm ci` or access the registry. The formal
+SDK tarball check in `--all` installs into a disposable directory with npm's
+offline mode.
+
+The Demo runner parses each JSON `ready`/`hello`/`failure`/`closed` event,
+compares the authenticated public key, PeerId, `/p2p` component, response, and
+two-stream result, and fails on timeout, pending signer requests, a live signer
+PID, or leftover signer/host/browser work. It is not a
+replacement for this document's stronger existing integration matrix.
+
 Install the test-only browser once for the current Playwright version:
 
 ```text
 cd typescript
-npm install
+npm ci
 npx playwright install chromium
 ```
 
@@ -72,9 +93,12 @@ Go WebRTC Direct constructor derives its DTLS certificate from
 `PrivKey.Raw()`; the SDK's safe default remains TCP and any raw-reading
 transport must be reviewed and explicitly injected by the caller.
 
-The only test application protocol is `/bitcoin-libp2p/test/echo/1.0.0`.
-It sends a bounded byte payload and receives the exact bytes back. It is not an
-identity protocol and is never registered by either SDK host assembler.
+The existing integration test application protocol is
+`/bitcoin-libp2p/test/echo/1.0.0`. It sends a bounded byte payload and receives
+the exact bytes back. It is not an identity protocol and is never registered by
+either SDK host assembler. The developer Demo uses the separate
+`/bitcoin-libp2p/demo/hello/1.0.0` protocol documented in
+[`examples/protocol.md`](../examples/protocol.md).
 
 The cross-process matrix is not accepted merely because an endpoint prints
 `OK`. Each client result must be parsed and compared with the server's actual

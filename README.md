@@ -14,6 +14,22 @@ Protocol ID，也可以直接握手与通信。
 - [V1 SDK 一次性施工单](施工单/20260826/001-bitcoin-libp2p-v1-sdk一次性施工单.md)
 - [V1 审计整改施工单](施工单/20260826/002-bitcoin-libp2p-v1-审计整改施工单.md)
 
+## 可运行 Demo
+
+从 [examples/README.md](examples/README.md) 开始可在约五分钟内跑通 Go 或 TypeScript Hello，
+再用另一语言 client 交叉连接。Demo-only Hello protocol、Remote Signer、Browser Worker 和
+native libp2p 对照端都在该入口中；它们使用正式 SDK public exports，不会被打进 SDK 包。
+
+```text
+./scripts/test-demos.sh --quick   # Go/TS 同语言与交叉 Hello，不卡 Chromium
+./scripts/test-demos.sh --all     # Remote Signer、真实 Chromium、native interop 与失败场景
+```
+
+完整的独立 integration 与浏览器回归仍见 [integration test 说明](docs/integration-tests.md)，
+不会由普通 `go test ./...` 或 `cd typescript && npm test` 自动启动。
+首次运行前请按 [examples/README.md](examples/README.md) 准备各 Demo 依赖；测试入口只检查依赖，
+不会在源码目录执行 npm 安装或访问 registry。
+
 Go SDK 的模块路径为 `github.com/bsv8/bitcoin-libp2p`，TypeScript 包名为
 `@bsv8/bitcoin-libp2p`。两端都采用私钥分离模型：SDK 只取得业务公钥和两个
 受限的 typed 签名能力，不负责保存、传输或管理业务私钥。
