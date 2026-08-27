@@ -1,0 +1,15 @@
+{
+  "test_only": true,
+  "invalid_private_keys_hex": [
+    "0000000000000000000000000000000000000000000000000000000000000000",
+    "fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141",
+    "fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364142",
+    "00",
+    "000000000000000000000000000000000000000000000000000000000000000000"
+  ],
+  "invalid_public_keys_hex": [
+    "04e940822d4e7a09ce013bed4fa812e92f22b0ed1fa2d1ad06ae0406680da1cc46",
+    "02ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+  ],
+  "notes": "All values in this file are malformed test inputs, never signing material."
+}

@@ -1,0 +1,56 @@
+{
+  "name": "@bsv8/bitcoin-libp2p",
+  "version": "1.0.0",
+  "license": "AGPL-3.0-only",
+  "description": "Standard libp2p secp256k1 identity with a typed remote-signer boundary",
+  "type": "module",
+  "exports": {
+    ".": "./dist/index.js",
+    "./identity": "./dist/identity/index.js",
+    "./signer": "./dist/signer/index.js",
+    "./libp2p": "./dist/libp2p/index.js"
+  },
+  "files": [
+    "README.md",
+    "LICENSE",
+    "dist/index.js",
+    "dist/index.d.ts",
+    "dist/index.js.map",
+    "dist/index.d.ts.map",
+    "dist/identity",
+    "dist/signer",
+    "dist/libp2p"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "build:integration": "tsc -p tsconfig.integration.json",
+    "build:browser": "npm run build:integration && esbuild src/integration/browser.ts --bundle --format=esm --platform=browser --outfile=dist-integration/browser.bundle.js && esbuild src/integration/browser-signer-worker.ts --bundle --format=esm --platform=browser --outfile=dist-integration/browser-signer-worker.js",
+    "test": "npm run build && vitest run",
+    "test:watch": "npm run build && vitest",
+    "test:integration": "npm run build:integration && bash ../scripts/test-integration.sh"
+  },
+  "dependencies": {
+    "@chainsafe/libp2p-noise": "17.0.0",
+    "@chainsafe/libp2p-yamux": "8.0.1",
+    "@libp2p/crypto": "5.1.23",
+    "@libp2p/identify": "4.1.13",
+    "@libp2p/interface": "3.3.0",
+    "@libp2p/peer-id": "6.0.15",
+    "@libp2p/peer-id-factory": "4.2.4",
+    "@libp2p/peer-record": "9.0.16",
+    "@libp2p/websockets": "10.1.20",
+    "@multiformats/multiaddr": "13.0.3",
+    "@noble/curves": "2.0.1",
+    "@noble/hashes": "2.0.1",
+    "libp2p": "3.3.9"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.51.1",
+    "@libp2p/tcp": "11.0.27",
+    "@libp2p/webrtc": "6.0.30",
+    "@types/node": "22.10.2",
+    "esbuild": "0.28.2",
+    "typescript": "5.7.2",
+    "vitest": "2.1.8"
+  }
+}
