@@ -3,8 +3,9 @@
 TypeScript 标准 libp2p secp256k1 identity SDK。host 只接收业务公钥和受保护的
 `TypedSigner`，不会接收业务 raw 私钥。
 
-```text
-# 0.2.0 尚未发布；发布后执行：
+当前 npm 正式版本为 `0.2.0`：
+
+```sh
 npm install bitcoin-libp2p@0.2.0
 ```
 
