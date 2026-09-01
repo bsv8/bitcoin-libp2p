@@ -152,6 +152,7 @@ go -C integration/native-go test ./...
 go -C integration/native-go-v045 test ./...
 check_native_isolation
 (cd typescript && npm test && npm run build:integration)
+node scripts/test-framing-integration.mjs
 
 start_go_sdk_server() {
   local name="$1"
@@ -217,6 +218,24 @@ run_client native_go_to_sdk_ts go -C integration/native-go run . -mode client -a
 
 start_go_sdk_server sdk_go_to_native_go045_extra
 run_client sdk_go_to_native_go045_extra go -C integration/native-go-v045 run . -mode client -addr "$server_addr"
+
+# V1.2 framing keeps several payloads on one Stream. The client closes its
+# write side only after the final frame; EOF is not used as a message boundary.
+start_go_sdk_server framing_go_to_ts
+start_ts_sdk_framing_client() {
+  local name="$1"
+  start_lane "${name}_client_lane" "$CLIENT_KEY" node typescript/dist-integration/integration/remote-signer.js
+  run_client "$name" node typescript/dist-integration/integration/node.js --mode client --addr "$server_addr" --signer-addr "$lane_addr" --public-key "$lane_public_key" --framing
+}
+start_ts_sdk_framing_client framing_go_to_ts
+
+start_ts_sdk_server framing_ts_to_go
+start_go_sdk_framing_client() {
+  local name="$1"
+  start_lane "${name}_client_lane" "$CLIENT_KEY" go run ./integration/remote-signer-go
+  run_client "$name" go run ./integration/sdk-go -mode client -addr "$server_addr" -signer-addr "$lane_addr" -public-key "$lane_public_key" -framing
+}
+start_go_sdk_framing_client framing_ts_to_go
 
 # Exercise the actual SDK host against independent signer processes. Each
 # failure mode must make the client return and must not emit an OK result.

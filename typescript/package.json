@@ -1,6 +1,6 @@
 {
   "name": "bitcoin-libp2p",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "license": "AGPL-3.0-only",
   "description": "Standard libp2p secp256k1 identity with a typed remote-signer boundary",
   "type": "module",
@@ -60,7 +60,7 @@
     "@libp2p/peer-id": "6.0.15",
     "@libp2p/peer-id-factory": "4.2.4",
     "@libp2p/peer-record": "9.0.16",
-    "@libp2p/webrtc": "6.0.30",
+    "@libp2p/webrtc": "6.0.31",
     "@libp2p/websockets": "10.1.20",
     "@multiformats/multiaddr": "13.0.3",
     "@noble/curves": "2.0.1",

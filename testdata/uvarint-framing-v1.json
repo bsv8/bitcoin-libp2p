@@ -1,0 +1,167 @@
+{
+  "schemaVersion": 1,
+  "descriptionZh": "bitcoin-libp2p V1.2 通用 uvarint Stream 分帧共享字节向量；所有 length 都是 payload 原始字节数，不是字符数。",
+  "fieldCommentsZh": {
+    "fixedVectors": "固定长度与对应最短 uvarint 前缀；pattern 用于避免在 fixture 中复制兆字节文本。",
+    "payloadByteLength": "payload 的原始字节长度。",
+    "payloadHex": "payload 的十六进制原始字节；不按字符串解码。",
+    "payloadPattern": "测试生成模式；incrementing-byte 表示第 i 个字节为 i mod 256。",
+    "prefixHex": "长度前缀的十六进制字节。",
+    "payloadVectors": "包含二进制、NUL、无效 UTF-8 和中文 UTF-8 的 payload。",
+    "chunkCases": "同一连续字节流的拆包方式；chunkByteLengths 是每个 chunk 的字节数。",
+    "invalidCases": "非法输入及两端必须使用的稳定错误分类。",
+    "limitCases": "本地接收上限测试；上限不进入任何 frame。"
+  },
+  "fixedVectors": [
+    {
+      "name": "length-0",
+      "descriptionZh": "允许的零长度通用 frame。",
+      "payloadByteLength": 0,
+      "payloadHex": "",
+      "prefixHex": "00"
+    },
+    {
+      "name": "length-1",
+      "descriptionZh": "单字节 uvarint 长度。",
+      "payloadByteLength": 1,
+      "payloadHex": "00",
+      "prefixHex": "01"
+    },
+    {
+      "name": "length-127",
+      "descriptionZh": "一字节 uvarint 的最大长度。",
+      "payloadByteLength": 127,
+      "payloadPattern": "incrementing-byte",
+      "prefixHex": "7f"
+    },
+    {
+      "name": "length-128",
+      "descriptionZh": "两字节 uvarint 的起点。",
+      "payloadByteLength": 128,
+      "payloadPattern": "incrementing-byte",
+      "prefixHex": "8001"
+    },
+    {
+      "name": "length-16383",
+      "descriptionZh": "两字节 uvarint 的最大长度。",
+      "payloadByteLength": 16383,
+      "payloadPattern": "incrementing-byte",
+      "prefixHex": "ff7f"
+    },
+    {
+      "name": "length-16384",
+      "descriptionZh": "三字节 uvarint 的起点。",
+      "payloadByteLength": 16384,
+      "payloadPattern": "incrementing-byte",
+      "prefixHex": "808001"
+    },
+    {
+      "name": "length-1048576",
+      "descriptionZh": "默认本地接收上限 1 MiB。",
+      "payloadByteLength": 1048576,
+      "payloadPattern": "incrementing-byte",
+      "prefixHex": "808040"
+    }
+  ],
+  "payloadVectors": [
+    {
+      "name": "binary-mixed",
+      "descriptionZh": "包含 NUL、非 ASCII 字节和不完整 UTF-8 序列；必须按原始字节分帧。",
+      "payloadHex": "00ff7f80c328"
+    },
+    {
+      "name": "utf8-chinese",
+      "descriptionZh": "中文 UTF-8 字节；长度按 byteLength 计算。",
+      "payloadHex": "e6af94e789b9e5b881e58886e5b8a7"
+    },
+    {
+      "name": "invalid-utf8",
+      "descriptionZh": "无效 UTF-8 原始字节；分帧层不得尝试字符串解码。",
+      "payloadHex": "fffec328"
+    }
+  ],
+  "chunkCases": [
+    {
+      "name": "split-prefix-and-payload",
+      "descriptionZh": "128 字节 payload 在两字节前缀和 payload 开始处都拆包。",
+      "frameNames": ["length-128"],
+      "chunkByteLengths": [1, 1, 1, 127],
+      "expectedFrameNames": ["length-128"]
+    },
+    {
+      "name": "multiple-frames-one-chunk",
+      "descriptionZh": "一个底层 chunk 同时包含空 frame、二进制 frame 和中文 frame。",
+      "frameNames": ["length-0", "binary-mixed", "utf8-chinese"],
+      "chunkByteLengths": ["all"],
+      "expectedFrameNames": ["length-0", "binary-mixed", "utf8-chinese"]
+    },
+    {
+      "name": "complete-then-partial-next",
+      "descriptionZh": "完整 frame 后紧跟下一个 frame 的部分字节。",
+      "frameNames": ["binary-mixed", "utf8-chinese"],
+      "chunkByteLengths": [8, 15],
+      "expectedFrameNames": ["binary-mixed", "utf8-chinese"]
+    },
+    {
+      "name": "one-byte-chunks",
+      "descriptionZh": "前缀和 payload 的每个位置都拆成单字节 chunk。",
+      "frameNames": ["utf8-chinese"],
+      "chunkByteLengths": [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+      "expectedFrameNames": ["utf8-chinese"]
+    }
+  ],
+  "invalidCases": [
+    {
+      "name": "non-canonical-one",
+      "descriptionZh": "整数 1 的非最短编码 81 00。",
+      "inputHex": "8100",
+      "code": "ERR_FRAME_PREFIX"
+    },
+    {
+      "name": "non-canonical-zero",
+      "descriptionZh": "整数 0 的非最短编码 80 00。",
+      "inputHex": "8000",
+      "code": "ERR_FRAME_PREFIX"
+    },
+    {
+      "name": "uvarint-overflow",
+      "descriptionZh": "第十个 uvarint 字节携带超过 uint64 的数据。",
+      "inputHex": "ffffffffffffffffff02",
+      "code": "ERR_FRAME_PREFIX"
+    },
+    {
+      "name": "uvarint-too-long",
+      "descriptionZh": "连续非终止字节超过 10 字节上界。",
+      "inputHex": "8080808080808080808001",
+      "code": "ERR_FRAME_PREFIX"
+    },
+    {
+      "name": "prefix-eof",
+      "descriptionZh": "前缀只有一个非终止字节就遇到 EOF。",
+      "inputHex": "80",
+      "code": "ERR_FRAME_TRUNCATED"
+    },
+    {
+      "name": "payload-eof",
+      "descriptionZh": "声明 3 字节 payload 但 EOF 前只有 2 字节。",
+      "inputHex": "030102",
+      "code": "ERR_FRAME_TRUNCATED"
+    }
+  ],
+  "limitCases": [
+    {
+      "name": "exact-default-limit",
+      "descriptionZh": "恰好等于默认 1 MiB 上限，允许读取。",
+      "maxInboundFrameBytes": 1048576,
+      "frameName": "length-1048576",
+      "code": ""
+    },
+    {
+      "name": "one-byte-over-default-limit",
+      "descriptionZh": "比默认 1 MiB 多 1 字节；只检查前缀，不分配 payload。",
+      "maxInboundFrameBytes": 1048576,
+      "inputHex": "818040",
+      "code": "ERR_FRAME_TOO_LARGE"
+    }
+  ]
+}

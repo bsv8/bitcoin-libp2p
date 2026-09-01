@@ -4,11 +4,12 @@ import { webSockets } from '@libp2p/websockets'
 import { multiaddr } from '@multiformats/multiaddr'
 import { authenticateConnection, createHost } from '../libp2p/index.js'
 import { bytesToHex, hexToBytes, type PeerRecordInput } from '../identity/index.js'
-import { readStreamToEnd } from '../stream/index.js'
+import { readStreamToEnd, readUvarintFrames, writeUvarintFrame } from '../stream/index.js'
 import { createWebRTCDirectDialer, dialAuthenticatedWebRTCDirect, parseWebRTCDirectEndpoint } from '../webrtc-direct/index.js'
 import type { TypedSigner } from '../signer/index.js'
 
 const PROTOCOL = '/bitcoin-libp2p/test/echo/1.0.0'
+const FRAMING_PROTOCOL = '/bitcoin-libp2p/test/uvarint-framing/1.0.0'
 const RESET_PROTOCOL = '/bitcoin-libp2p/test/reset/1.0.0'
 const TEST_ONLY_PUBLIC_KEY = '0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798'
 const TEST_ONLY_REMOTE_PUBLIC_KEY = '02e940822d4e7a09ce013bed4fa812e92f22b0ed1fa2d1ad06ae0406680da1cc46'
@@ -128,6 +129,16 @@ function payload (length: number): Uint8Array {
   return result
 }
 
+function framingPayloads (): Uint8Array[] {
+  return [new TextEncoder().encode('framing'), new TextEncoder().encode('中文 payload'), payload(128 * 1024)]
+}
+
+async function readFramed (stream: Parameters<typeof readUvarintFrames>[0]): Promise<Uint8Array[]> {
+  const output: Uint8Array[] = []
+  for await (const value of readUvarintFrames(stream)) output.push(value)
+  return output
+}
+
 async function main (): Promise<void> {
   const params = new URLSearchParams(location.search)
   const address = params.get('addr')
@@ -240,6 +251,15 @@ async function main (): Promise<void> {
       const response = await responsePromise
       if (!equalBytes(data, response)) throw new Error('browser echo response did not match')
     }
+    const framingData = framingPayloads()
+    const framingStream = await connection.newStream(FRAMING_PROTOCOL, { signal: AbortSignal.timeout(15_000) })
+    const framingResponsePromise = readFramed(framingStream)
+    for (const data of framingData) writeUvarintFrame(framingStream, data)
+    await framingStream.close()
+    const framingResponses = await framingResponsePromise
+    if (framingResponses.length !== framingData.length || framingResponses.some((value, index) => !equalBytes(value, framingData[index]))) {
+      throw new Error('browser framing response did not match')
+    }
     publish('PASS', {
       peerId: authenticated.peerId.toString(),
       publicKey: bytesToHex(authenticated.publicKey),
@@ -252,6 +272,7 @@ async function main (): Promise<void> {
       }),
       noiseRequests: String(signer.noiseRequests),
       streams: '2',
+      framingFrames: String(framingResponses.length),
       pendingSigners: String(signer.pendingCount)
     })
   } finally {

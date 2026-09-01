@@ -57,7 +57,7 @@ try {
   if (consoleErrors.length > 0) throw new Error(`console error: ${consoleErrors.join('; ')}`)
 
   if (scenario == null || (transport === 'webrtc-direct' && directSuccessScenarios.has(scenario))) {
-    if (result.status !== 'PASS' || result.peerId !== expectedPeerId || result.publicKey !== expectedPublicKey || result.noiseRequests !== '1' || result.streams !== '2' || result.pendingSigners !== '0') {
+    if (result.status !== 'PASS' || result.peerId !== expectedPeerId || result.publicKey !== expectedPublicKey || result.noiseRequests !== '1' || result.streams !== '2' || result.framingFrames !== '3' || result.pendingSigners !== '0') {
       throw new Error(`browser result assertion failed: ${JSON.stringify(result)}`)
     }
     if (transport === 'webrtc-direct') {

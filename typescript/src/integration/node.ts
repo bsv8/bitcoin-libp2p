@@ -4,10 +4,11 @@ import { tcp } from '@libp2p/tcp'
 import { multiaddr } from '@multiformats/multiaddr'
 import { createHost } from '../libp2p/index.js'
 import { hexToBytes } from '../identity/index.js'
-import { readStreamToEnd } from '../stream/index.js'
+import { readStreamToEnd, readUvarintFrames, writeUvarintFrame } from '../stream/index.js'
 import { RemoteSigner } from './remote-signer.js'
 
 const PROTOCOL = '/bitcoin-libp2p/test/echo/1.0.0'
+const FRAMING_PROTOCOL = '/bitcoin-libp2p/test/uvarint-framing/1.0.0'
 
 function option (name: string): string | undefined {
   const index = process.argv.indexOf(name)
@@ -22,6 +23,16 @@ function payload (size: number): Uint8Array {
 
 function equalBytes (a: Uint8Array, b: Uint8Array): boolean {
   return a.length === b.length && a.every((value, index) => value === b[index])
+}
+
+function framingPayloads (): Uint8Array[] {
+  return [new TextEncoder().encode('framing'), new TextEncoder().encode('中文 payload'), payload(128 * 1024)]
+}
+
+async function readFramed (stream: Parameters<typeof readUvarintFrames>[0]): Promise<Uint8Array[]> {
+  const output: Uint8Array[] = []
+  for await (const value of readUvarintFrames(stream)) output.push(value)
+  return output
 }
 
 async function main (): Promise<void> {
@@ -57,6 +68,14 @@ async function main (): Promise<void> {
       stream.send(input)
       await stream.close()
     })
+    await node.handle(FRAMING_PROTOCOL, async stream => {
+      try {
+        for await (const value of readUvarintFrames(stream)) writeUvarintFrame(stream, value)
+        await stream.close()
+      } catch {
+        stream.abort(new Error('framing handler failed'))
+      }
+    })
     const listen = node.getMultiaddrs()[0]?.decapsulateCode(421)
     if (listen == null) throw new Error('host did not listen')
     console.log(`READY ${node.peerId.toString()} ${listen.encapsulate(`/p2p/${node.peerId.toString()}`).toString()} ${Buffer.from(publicKey).toString('hex')}`)
@@ -69,13 +88,25 @@ async function main (): Promise<void> {
   if (hostStopAfterMs != null) setTimeout(() => { void node.stop() }, hostStopAfterMs)
   const remoteAddress = multiaddr(remote)
   const connection = await node.dial(remoteAddress, { signal: AbortSignal.timeout(10_000) })
-  for (const data of [new TextEncoder().encode('hello'), payload(128 * 1024)]) {
-    const stream = await connection.newStream(PROTOCOL, { signal: AbortSignal.timeout(10_000) })
-    const responsePromise = readStreamToEnd(stream)
-    stream.send(data)
+  if (process.argv.includes('--framing')) {
+    const data = framingPayloads()
+    const stream = await connection.newStream(FRAMING_PROTOCOL, { signal: AbortSignal.timeout(10_000) })
+    const responsePromise = readFramed(stream)
+    for (const value of data) writeUvarintFrame(stream, value)
     await stream.close()
-    const response = await responsePromise
-    if (!equalBytes(data, response)) throw new Error('echo response did not match')
+    const responses = await responsePromise
+    if (responses.length !== data.length || responses.some((value, index) => !equalBytes(value, data[index]))) {
+      throw new Error('framing response did not match')
+    }
+  } else {
+    for (const data of [new TextEncoder().encode('hello'), payload(128 * 1024)]) {
+      const stream = await connection.newStream(PROTOCOL, { signal: AbortSignal.timeout(10_000) })
+      const responsePromise = readStreamToEnd(stream)
+      stream.send(data)
+      await stream.close()
+      const response = await responsePromise
+      if (!equalBytes(data, response)) throw new Error('echo response did not match')
+    }
   }
   const authenticated = connection.remotePeer
   if (authenticated.type !== 'secp256k1') throw new Error('remote peer is not secp256k1')

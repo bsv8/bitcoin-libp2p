@@ -14,11 +14,20 @@ Protocol ID，也可以直接握手与通信。
 - [V1 SDK 一次性施工单](施工单/20260826/001-bitcoin-libp2p-v1-sdk一次性施工单.md)
 - [V1 审计整改施工单](施工单/20260826/002-bitcoin-libp2p-v1-审计整改施工单.md)
 
-V1.1 已实现 Stream 和 WebRTC Direct 的 SDK 封装，当前作为目标版本 `0.2.0` 的新增公开 API；
-`0.2.0` 尚未发布：
+V1.1 已实现 Stream 和 WebRTC Direct 的 SDK 封装。`0.2.0` 已发布，是不可修改的 V1.1
+基线：
 
 - [V1.1 Stream 与 WebRTC Direct SDK 扩展需求](docs/bitcoin-libp2p-v1.1-stream-webrtc-direct-需求文档.md)
 - [004 Stream 与 WebRTC Direct SDK 施工单](施工单/20260827/004-bitcoin-libp2p-stream-webrtc-direct-sdk施工单.md)
+
+V1.2 已在 Go/TypeScript 增加通用 uvarint Stream 分帧，双语言包版本为 `0.3.0`；
+`0.3.0` 是下一版本，目前仅完成本地发布准备，尚未发布。
+发送 API 只接收 payload 并自动计算原始字节长度；最大接收长度只是本地安全检查，
+不发送给对端、不握手、不协商：
+
+- [V1.2 uvarint Stream 分帧需求](docs/bitcoin-libp2p-v1.2-uvarint-stream-framing-需求文档.md)
+- [005 uvarint Stream 分帧施工单](施工单/20260901/005-bitcoin-libp2p-uvarint-stream-framing施工单.md)
+- [006 TypeScript 接收队列安全整改施工单](施工单/20260901/006-TypeScript-uvarint接收队列安全整改施工单.md)
 
 ## 可运行 Demo
 
@@ -40,13 +49,42 @@ Go SDK 的模块路径为 `github.com/bsv8/bitcoin-libp2p`，TypeScript 包名�
 `bitcoin-libp2p`。两端都采用私钥分离模型：SDK 只取得业务公钥和两个
 受限的 typed 签名能力，不负责保存、传输或管理业务私钥。
 
-当前双语言目标版本为 `0.2.0`（仅本地验收版本，尚未发布）：
+当前双语言包版本为 `0.3.0`：
 
 ```text
 # 发布后再安装：
-go get github.com/bsv8/bitcoin-libp2p@v0.2.0
-npm install bitcoin-libp2p@0.2.0
+go get github.com/bsv8/bitcoin-libp2p@v0.3.0
+npm install bitcoin-libp2p@0.3.0
 ```
+
+## uvarint Stream 分帧最小用法
+
+分帧格式是 `uvarint(payload 原始字节数) || payload`。分帧层只恢复消息边界，不解码
+CBOR、JSON、Protobuf 或 SSP；`maxInboundFrameBytes`（本地单条 payload 接收上限）只在
+初始化时设置，默认 `1 MiB`。
+
+```go
+import "github.com/bsv8/bitcoin-libp2p/streamio"
+
+framer, err := streamio.NewUvarintFramer(stream) // 默认本地接收上限 1 MiB
+if err != nil { /* 处理初始化错误 */ }
+_ = framer.WriteFrame(sspWire)                  // 只传 payload，SDK 自动计算 len
+wire, err := framer.ReadFrame()                 // 返回不含前缀的完整 payload
+```
+
+```ts
+import { readUvarintFrames, writeUvarintFrame } from 'bitcoin-libp2p/stream'
+
+writeUvarintFrame(stream, sspWire) // 只传 payload，SDK 自动使用 byteLength
+for await (const wire of readUvarintFrames(stream)) {
+  // wire 是一条完整原始 payload；Protocol ID/SSP/CBOR 由上层负责
+}
+```
+
+TypeScript framing options 的字段含义：`maxInboundFrameBytes` 是单条 payload 的本地接收上限，
+`maxBufferedBytes` 是 reader 持有的未消费字节总上限，`maxBufferedFrames` 是已完成未消费帧数上限，
+`signal` 是长期读取的取消信号，`abortStreamOnError` 是分帧错误时是否 abort Stream；默认分别为
+`1 MiB`、`4 MiB`、`1024`、不设置、`true`。
 
 版本清单、发布门禁和发布顺序见 [双语言发布说明](release/README.md)。
 

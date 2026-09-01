@@ -17,6 +17,69 @@ long-running listeners. The explicit integration entry points are:
 ./scripts/test-demos.sh --all
 ```
 
+## V1.2 uvarint framing 验收
+
+通用分帧的跨语言验收由以下入口执行；它不会启动 Chromium 或访问外部网络：
+
+```text
+node scripts/test-framing-integration.mjs
+```
+
+`./scripts/test-integration.sh` 会先构建 TypeScript integration，再自动调用上面的入口，
+并额外运行 Go SDK ↔ TypeScript SDK 的真实长连接场景。每条 framing Stream 在同一条连接上
+交换小 payload、中文 UTF-8 字节和 128 KiB payload；只有最后一条消息后才关闭本地写端。
+
+跨语言脚本输出一行结构化 JSON，字段含义如下：
+
+| 字段 | 中文含义 |
+|---|---|
+| `event` | 验收事件名称；`uvarint-framing-cross-language` 表示跨语言结果 |
+| `vectors` | 参与 Go/TypeScript 编码互解的 payload 数量 |
+| `byteExact` | 两端 frame 字节是否逐字节一致 |
+| `invalidCases` | 非法前缀、截断和超限输入的稳定错误分类 |
+| `maxInboundFrameBytes` | 仅本地检查的接收上限；不会进入 frame 或发送给对端 |
+
+浏览器验收 `./scripts/test-browser-integration.sh` 的成功场景还会在原有两条有限响应
+Stream 之外，显式使用 `bitcoin-libp2p/stream` 交换 3 条 framing 消息，因此 WebSocket
+和 WebRTC Direct 都覆盖同义 framing。浏览器结果中的 `framingFrames` 是收到的完整
+payload 数量，必须为 `3`；`streams` 仍表示原有有限响应 Stream 数量，必须为 `2`。
+
+SSP 等上层协议的边界示例：
+
+```text
+业务 Protocol ID：/ssp/1.0.0                 # 由 SSP 定义
+Stream framing：bitcoin-libp2p uvarint       # 由本 SDK 实现
+本地接收上限：1 MiB                           # 本地检查，不发给对端
+payload：完整 SSP Wire                        # 由 SSP 解码和校验
+```
+
+framing 层不 import SSP、不解码业务 payload，也不把 `readStreamToEnd` 用作长期多消息
+Stream 的替代品。
+
+## V1.2 验收记录（2026-09-01）
+
+A08 全量回归已通过：
+
+```text
+go test ./...
+go test -race ./...
+go vet ./...
+(cd typescript && npm test)                 # 5 files, 63 tests
+node scripts/test-framing-integration.mjs   # vectors=10, byteExact=true
+./scripts/test-integration.sh
+./scripts/test-browser-integration.sh      # WebSocket/Direct 各 20/20
+./scripts/test-demos.sh --all
+(cd typescript && npm pack --dry-run)       # 0.3.0 tarball 含 /stream JS、声明和 source map
+make release-check                           # 0.3.0 发布门禁通过
+```
+
+跨语言非法输入分类、默认 1 MiB 上限、Go 并发写、TypeScript 拆包/粘包/多 frame、EOF、
+reset、取消和 listener/buffer 清理均通过。真实 SDK 集成在同一条 Stream 上交换小 payload、
+中文 UTF-8 payload 和 128 KiB payload；浏览器 WebSocket 与 WebRTC Direct 成功场景均报告
+`framingFrames=3`。TypeScript reader 还验证默认 4 MiB/1024 帧的未消费队列上限、
+`ERR_FRAME_BUFFER_FULL`、options 快照和 `abortStreamOnError: false` 清理路径。未执行
+npm publish、Go tag 创建或远程 push。
+
 The first command is reserved for the Go/TypeScript SDK and native libp2p
 interop matrix, including the isolated `go-libp2p v0.45.0` native endpoint.
 The second is reserved for real headless Chromium WebSocket and WebRTC Direct
@@ -131,7 +194,7 @@ go vet ./...
 make release-check
 ```
 
-其中 TypeScript 单元测试当前为 41 tests；WebSocket 和 WebRTC Direct 浏览器场景各完成 20/20 正向重复；错误端口/certhash 在拨号阶段
+其中 V1.1 当时 TypeScript 单元测试为 41 tests；WebSocket 和 WebRTC Direct 浏览器场景各完成 20/20 正向重复；错误端口/certhash 在拨号阶段
 返回 `ERR_WEBRTC_DIRECT_DIAL/dial`，错误地址 PeerId/期望公钥返回
 `ERR_WEBRTC_DIRECT_PEER_ID/validate`，DNS 不可用返回
 `ERR_WEBRTC_DIRECT_RESOLVE/resolve`，外部取消返回 `ERR_WEBRTC_DIRECT_TIMEOUT/dial`。
@@ -141,11 +204,6 @@ make release-check
 PeerId/Noise 身份不变，旧 certhash 测试使用新服务器的 host、UDP 端口和 PeerId，仅替换
 certhash，并返回 `DIAL/dial`；新地址 PASS。真实 Go reset 被 `/stream` 转换为
 `ERR_STREAM_ABORTED/stream`。没有 WebSocket fallback，所有场景报告 `pendingSigners=0`。
-`make release-check` 同时验证 `0.2.0` 正式 tarball 的两个
-新 subpath、声明、source map、运行时 import 和 TypeScript 消费者，并按
-[`npm-audit-risk-acceptance-0.2.0.json`](../release/npm-audit-risk-acceptance-0.2.0.json)
-精确核对限期接受的生产依赖 audit 结果。
-
 The cross-process matrix is not accepted merely because an endpoint prints
 `OK`. Each client result must be parsed and compared with the server's actual
 PeerId, the expected compressed public key, and the `/p2p` address component.

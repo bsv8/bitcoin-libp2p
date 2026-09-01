@@ -8,12 +8,12 @@
   "packages": {
     "npm": {
       "name": "bitcoin-libp2p",
-      "version": "0.2.0"
+      "version": "0.3.0"
     },
     "go": {
       "module": "github.com/bsv8/bitcoin-libp2p",
-      "version": "0.2.0",
-      "tag": "v0.2.0"
+      "version": "0.3.0",
+      "tag": "v0.3.0"
     }
   }
 }

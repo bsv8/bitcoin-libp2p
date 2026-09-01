@@ -1,5 +1,16 @@
 import type { Stream, StreamCloseEvent, StreamMessageEvent } from '@libp2p/interface'
 
+export {
+  DEFAULT_MAX_BUFFERED_BYTES,
+  DEFAULT_MAX_BUFFERED_FRAMES,
+  DEFAULT_MAX_INBOUND_FRAME_BYTES,
+  StreamFrameError,
+  encodeUvarintFrame,
+  readUvarintFrames,
+  writeUvarintFrame
+} from './framing.js'
+export type { StreamFrameErrorCode, UvarintFramingOptions } from './framing.js'
+
 /** `readStreamToEnd` 可返回的稳定错误码。 */
 export type StreamIOErrorCode =
   | 'ERR_STREAM_TIMEOUT'

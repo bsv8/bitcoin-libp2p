@@ -17,7 +17,7 @@ const run = (command, args, options = {}) => execFileSync(command, args, {
 const versions = readJson(join(repoDir, 'release/versions.json'))
 const packageJson = readJson(join(typescriptDir, 'package.json'))
 const packageLock = readJson(join(typescriptDir, 'package-lock.json'))
-const auditAcceptance = readJson(join(repoDir, 'release/npm-audit-risk-acceptance-0.2.0.json'))
+const auditAcceptance = readJson(join(repoDir, `release/npm-audit-risk-acceptance-${versions.packages.npm.version}.json`))
 const goMod = readFileSync(join(repoDir, 'go.mod'), 'utf8')
 
 assert.equal(versions.schemaVersion, 1, 'unsupported release manifest schema')
@@ -170,13 +170,14 @@ import { createHost } from 'bitcoin-libp2p'
 import { bytesToHex } from 'bitcoin-libp2p/identity'
 import { LocalSigner } from 'bitcoin-libp2p/signer'
 import { authenticateConnection } from 'bitcoin-libp2p/libp2p'
-import { readStreamToEnd } from 'bitcoin-libp2p/stream'
+import { encodeUvarintFrame, readStreamToEnd, readUvarintFrames, writeUvarintFrame } from 'bitcoin-libp2p/stream'
 import { buildWebRTCDirectEndpoint, parseWebRTCDirectEndpoint } from 'bitcoin-libp2p/webrtc-direct'
 if (typeof createHost !== 'function') throw new Error('root export is unavailable')
 if (typeof bytesToHex !== 'function') throw new Error('identity export is unavailable')
 if (typeof LocalSigner !== 'function') throw new Error('signer export is unavailable')
 if (typeof authenticateConnection !== 'function') throw new Error('libp2p export is unavailable')
 if (typeof readStreamToEnd !== 'function') throw new Error('stream export is unavailable')
+if (typeof encodeUvarintFrame !== 'function' || typeof readUvarintFrames !== 'function' || typeof writeUvarintFrame !== 'function') throw new Error('uvarint framing export is unavailable')
 if (typeof buildWebRTCDirectEndpoint !== 'function' || typeof parseWebRTCDirectEndpoint !== 'function') throw new Error('webrtc-direct export is unavailable')
 `)
   run('node', ['runtime.mjs'], { cwd: consumerDir })
@@ -186,7 +187,7 @@ import { createHost } from 'bitcoin-libp2p'
 import { bytesToHex, type BytesLike } from 'bitcoin-libp2p/identity'
 import { LocalSigner, type TypedSigner } from 'bitcoin-libp2p/signer'
 import { authenticateConnection, type HostConfig } from 'bitcoin-libp2p/libp2p'
-import { readStreamToEnd, type ReadStreamToEndOptions } from 'bitcoin-libp2p/stream'
+import { encodeUvarintFrame, readStreamToEnd, readUvarintFrames, writeUvarintFrame, type ReadStreamToEndOptions, type StreamFrameErrorCode, type UvarintFramingOptions } from 'bitcoin-libp2p/stream'
 import { buildWebRTCDirectEndpoint, type BuildWebRTCDirectEndpointInput, type WebRTCDirectEndpoint } from 'bitcoin-libp2p/webrtc-direct'
 const bytes: BytesLike = new Uint8Array()
 const signer: TypedSigner = new LocalSigner(new Uint8Array(32).fill(1))
@@ -194,7 +195,10 @@ const config: HostConfig = { signer, start: false }
 const endpointInput: BuildWebRTCDirectEndpointInput = { hostType: 'dns', host: 'example.test', udpPort: 443, certhash: 'uEiAAAQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHw', publicKey: new Uint8Array(33) }
 const endpoint: WebRTCDirectEndpoint | undefined = undefined
 const options: ReadStreamToEndOptions = { timeoutMs: 15000, maxBytes: 1024 }
-void [createHost, bytesToHex(bytes.subarray()), authenticateConnection, readStreamToEnd, buildWebRTCDirectEndpoint, config, endpointInput, endpoint, options]
+const framingOptions: UvarintFramingOptions = { maxInboundFrameBytes: 1024, abortStreamOnError: true }
+const framed: Uint8Array = encodeUvarintFrame(bytes.subarray())
+const frameCode: StreamFrameErrorCode = 'ERR_FRAME_PREFIX'
+void [createHost, bytesToHex(bytes.subarray()), authenticateConnection, readStreamToEnd, readUvarintFrames, writeUvarintFrame, buildWebRTCDirectEndpoint, config, endpointInput, endpoint, options, framingOptions, framed, frameCode]
 `)
   writeFileSync(join(consumerDir, 'tsconfig.json'), JSON.stringify({
     compilerOptions: {

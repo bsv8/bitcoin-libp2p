@@ -26,6 +26,7 @@ func main() {
 	signerAddress := flag.String("signer-addr", "", "test-only remote signer lane address")
 	signTimeoutMS := flag.Int("sign-timeout-ms", 0, "test-only signer timeout in milliseconds")
 	hostStopAfterMS := flag.Int("host-stop-after-ms", 0, "test-only host stop delay in milliseconds")
+	framing := flag.Bool("framing", false, "test-only: use the uvarint framing protocol")
 	flag.Parse()
 
 	publicKey, err := hex.DecodeString(*publicKeyHex)
@@ -46,7 +47,11 @@ func main() {
 	hostConfig := golibp2p.HostConfig{
 		Signer:      remoteSigner,
 		ListenAddrs: listen,
-		Services:    []golibp2p.Service{func(h host.Host) error { echo.Install(h); return nil }},
+		Services: []golibp2p.Service{func(h host.Host) error {
+			echo.Install(h)
+			echo.InstallFraming(h)
+			return nil
+		}},
 	}
 	if *signTimeoutMS > 0 {
 		hostConfig.SignTimeout = time.Duration(*signTimeoutMS) * time.Millisecond
@@ -96,10 +101,17 @@ func main() {
 	if err != nil {
 		fatal(err)
 	}
-	for _, payload := range [][]byte{[]byte("hello"), bytesOf(128 * 1024)} {
-		response, err := echo.RoundTrip(ctx, h, info.ID, payload)
-		if err != nil || string(response) != string(payload) {
-			fatal(fmt.Errorf("echo failed: %v", err))
+	if *framing {
+		payloads := [][]byte{[]byte("framing"), []byte("中文 payload"), bytesOf(128 * 1024)}
+		if _, err := echo.FramingRoundTrip(ctx, h, info.ID, payloads); err != nil {
+			fatal(fmt.Errorf("framing round trip failed: %v", err))
+		}
+	} else {
+		for _, payload := range [][]byte{[]byte("hello"), bytesOf(128 * 1024)} {
+			response, err := echo.RoundTrip(ctx, h, info.ID, payload)
+			if err != nil || string(response) != string(payload) {
+				fatal(fmt.Errorf("echo failed: %v", err))
+			}
 		}
 	}
 	fmt.Printf("OK %s %s %s\n", authenticated.PeerID, hex.EncodeToString(authenticated.PublicKey), info.ID)

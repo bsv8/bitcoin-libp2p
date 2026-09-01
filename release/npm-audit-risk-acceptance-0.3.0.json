@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "fieldCommentsZh": {
+    "releaseVersion": "本风险接受只适用于该 npm 发布版本",
+    "decision": "风险处置结论；accepted-with-controls 表示仅在控制条件内限期接受",
+    "assessedAt": "完成依赖与运行路径审查的日期",
+    "reviewBy": "最晚复查日期；超过该日期发布门禁必须失败",
+    "dependencyRoot": "引入风险依赖链的直接生产依赖及审查时最新版",
+    "acceptedAudit": "允许的完整 npm audit 结果；包名、数量或严重级别变化都必须重新审查",
+    "dependencyPath": "从直接依赖到漏洞包的完整传递路径",
+    "scopeZh": "为什么风险不在当前浏览器和 Node.js 正式运行路径中",
+    "controlsZh": "接受风险期间必须持续满足的控制条件",
+    "reopenConditionsZh": "任一条件发生时必须撤销本结论并重新审查"
+  },
+  "releaseVersion": "0.3.0",
+  "decision": "accepted-with-controls",
+  "assessedAt": "2026-09-01",
+  "reviewBy": "2026-09-27",
+  "dependencyRoot": {
+    "name": "@libp2p/webrtc",
+    "version": "6.0.31",
+    "latestStableAtAssessment": "6.0.31"
+  },
+  "acceptedAudit": {
+    "critical": 0,
+    "high": 7,
+    "packages": [
+      "@react-native/community-cli-plugin",
+      "@react-native/virtualized-lists",
+      "image-size",
+      "metro",
+      "metro-config",
+      "metro-transform-worker",
+      "react-native"
+    ]
+  },
+  "dependencyPath": [
+    "@libp2p/webrtc@6.0.31",
+    "react-native-webrtc@124.0.8",
+    "react-native@0.87.1",
+    "Metro@0.87.0",
+    "image-size@1.2.1"
+  ],
+  "scopeZh": "风险位于 react-native-webrtc 的 React Native 条件导出所安装的 Metro 图片解析工具链。bitcoin-libp2p 0.3.0 的浏览器 WebRTC Direct bundle 使用浏览器原生 RTCPeerConnection，默认 Node.js 导出使用 node-datachannel，正式 dist 和浏览器 bundle 均没有 react-native-webrtc、Metro 或 image-size 的直接导入。审查时 @libp2p/webrtc 6.0.31 已是最新版，image-size 2.0.2 是最新版本且仍在公告影响范围内，因此没有可验证的无漏洞上游升级目标。",
+  "controlsZh": [
+    "发布门禁必须精确比对完整 npm audit 的包名、high 数量和 critical 数量；开发依赖不得另行豁免",
+    "正式浏览器 20 次 WebRTC Direct 与 Node.js 消费者运行时导入必须继续通过",
+    "不得在 SDK 中直接导入 react-native-webrtc、react-native、Metro 或 image-size",
+    "不得使用 npm audit fix --force 或未经互操作验证的 overrides 隐藏告警"
+  ],
+  "reopenConditionsZh": [
+    "超过 reviewBy 日期",
+    "@libp2p/webrtc 发布新稳定版",
+    "audit 包名、数量或严重级别发生变化",
+    "新增 React Native 正式支持或相关依赖进入浏览器/Node.js 运行路径"
+  ]
+}

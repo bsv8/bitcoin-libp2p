@@ -4,8 +4,11 @@
 package main
 
 import (
+	"bufio"
+	"bytes"
 	"context"
 	"crypto/rand"
+	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -34,8 +37,10 @@ import (
 )
 
 const (
-	helloProtocol = protocol.ID("/bitcoin-libp2p/demo/hello/1.0.0")
-	maxMessage    = 1 << 10
+	helloProtocol   = protocol.ID("/bitcoin-libp2p/demo/hello/1.0.0")
+	framingProtocol = protocol.ID("/bitcoin-libp2p/test/uvarint-framing/1.0.0")
+	maxMessage      = 1 << 10
+	maxFrame        = 1 << 20
 )
 
 type readyEvent struct {
@@ -225,6 +230,85 @@ func installHello(h host.Host) {
 			_ = stream.CloseWrite()
 		}()
 	})
+	h.SetStreamHandler(framingProtocol, func(stream network.Stream) {
+		go func() {
+			defer stream.Close()
+			reader := bufio.NewReader(stream)
+			for {
+				length, err := readCanonicalUvarint(reader)
+				if err == io.EOF {
+					break
+				}
+				if err != nil || length > maxFrame {
+					_ = stream.Reset()
+					return
+				}
+				payload := make([]byte, int(length))
+				if _, err := io.ReadFull(reader, payload); err != nil {
+					_ = stream.Reset()
+					return
+				}
+				var prefix [binary.MaxVarintLen64]byte
+				prefixLength := binary.PutUvarint(prefix[:], length)
+				frame := make([]byte, prefixLength+len(payload))
+				copy(frame, prefix[:prefixLength])
+				copy(frame[prefixLength:], payload)
+				if err := writeAll(stream, frame); err != nil {
+					_ = stream.Reset()
+					return
+				}
+			}
+			_ = stream.CloseWrite()
+		}()
+	})
+}
+
+func readCanonicalUvarint(reader *bufio.Reader) (uint64, error) {
+	var encoded [binary.MaxVarintLen64]byte
+	for index := 0; index < len(encoded); index++ {
+		value, err := reader.ReadByte()
+		if err != nil {
+			if index == 0 && err == io.EOF {
+				return 0, io.EOF
+			}
+			return 0, err
+		}
+		encoded[index] = value
+		if value&0x80 != 0 {
+			if index == len(encoded)-1 {
+				return 0, errors.New("uvarint prefix is too long")
+			}
+			continue
+		}
+		decoded, consumed := binary.Uvarint(encoded[:index+1])
+		if consumed <= 0 {
+			return 0, errors.New("uvarint prefix overflows")
+		}
+		var canonical [binary.MaxVarintLen64]byte
+		canonicalLength := binary.PutUvarint(canonical[:], decoded)
+		if canonicalLength != index+1 || !bytes.Equal(canonical[:canonicalLength], encoded[:index+1]) {
+			return 0, errors.New("uvarint prefix is not minimally encoded")
+		}
+		return decoded, nil
+	}
+	return 0, errors.New("uvarint prefix is too long")
+}
+
+func writeAll(writer io.Writer, data []byte) error {
+	for len(data) > 0 {
+		written, err := writer.Write(data)
+		if written < 0 || written > len(data) {
+			return errors.New("stream writer returned an invalid byte count")
+		}
+		data = data[written:]
+		if err != nil {
+			return err
+		}
+		if written == 0 {
+			return io.ErrShortWrite
+		}
+	}
+	return nil
 }
 
 func roundTrip(ctx context.Context, h host.Host, id peer.ID, message []byte) ([]byte, error) {
