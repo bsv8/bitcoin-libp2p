@@ -20,14 +20,22 @@ V1.1 已实现 Stream 和 WebRTC Direct 的 SDK 封装。`0.2.0` 已发布，是
 - [V1.1 Stream 与 WebRTC Direct SDK 扩展需求](docs/bitcoin-libp2p-v1.1-stream-webrtc-direct-需求文档.md)
 - [004 Stream 与 WebRTC Direct SDK 施工单](施工单/20260827/004-bitcoin-libp2p-stream-webrtc-direct-sdk施工单.md)
 
-V1.2 已在 Go/TypeScript 增加通用 uvarint Stream 分帧，双语言包版本为 `0.3.0`；
-`0.3.0` 是下一版本，目前仅完成本地发布准备，尚未发布。
+V1.2 已在 Go/TypeScript 增加通用 uvarint Stream 分帧，双语言包版本为 `0.3.0`，
+已发布，是不可修改的 V1.2 基线。
 发送 API 只接收 payload 并自动计算原始字节长度；最大接收长度只是本地安全检查，
 不发送给对端、不握手、不协商：
 
 - [V1.2 uvarint Stream 分帧需求](docs/bitcoin-libp2p-v1.2-uvarint-stream-framing-需求文档.md)
 - [005 uvarint Stream 分帧施工单](施工单/20260901/005-bitcoin-libp2p-uvarint-stream-framing施工单.md)
 - [006 TypeScript 接收队列安全整改施工单](施工单/20260901/006-TypeScript-uvarint接收队列安全整改施工单.md)
+
+V1.3 新增 `/webrtc-interconnect`：SDK 内部管理 `RTCPeerConnection` 和 DataChannel，业务
+外壳只提供一个与消息服务无关的外部信令 adapter，换来标准 libp2p `Connection`/`Stream`。
+不引用 SatSubscription、ChannelProtocol 或 Circuit Relay，不实现 TURN 与 WebSocket
+fallback。双浏览器大流量外部信令 E2E 是硬门槛：
+
+- [V1.3 外部信令 WebRTC 需求](docs/bitcoin-libp2p-v1.3-external-signaling-webrtc-需求文档.md)
+- [007 外部信令 WebRTC SDK 施工单](施工单/20260925/007-bitcoin-libp2p-external-signaling-webrtc-sdk施工单.md)
 
 ## 可运行 Demo
 
@@ -49,12 +57,12 @@ Go SDK 的模块路径为 `github.com/bsv8/bitcoin-libp2p`，TypeScript 包名�
 `bitcoin-libp2p`。两端都采用私钥分离模型：SDK 只取得业务公钥和两个
 受限的 typed 签名能力，不负责保存、传输或管理业务私钥。
 
-当前双语言包版本为 `0.3.0`：
+当前双语言包版本为 `0.3.1`：
 
 ```text
 # 发布后再安装：
-go get github.com/bsv8/bitcoin-libp2p@v0.3.0
-npm install bitcoin-libp2p@0.3.0
+go get github.com/bsv8/bitcoin-libp2p@v0.3.1
+npm install bitcoin-libp2p@0.3.1
 ```
 
 ## uvarint Stream 分帧最小用法
@@ -107,8 +115,9 @@ Yamux；`Raw/raw` 明确不可提取，签名结果在交给上游前以绑定�
 交易或业务消息签名。
 
 已支持：secp256k1 identity、标准 TCP/WebSocket/可注入 transport、浏览器 WebRTC Direct
-出站拨号、严格 endpoint/certhash 校验、有界 Stream 读取、标准 Noise/Yamux/Identify、
-Signed Peer Record、authenticated remote public key 与 pin。未支持且有意留在
+出站拨号、外部信令 WebRTC 互联、严格 endpoint/certhash 校验、有界 Stream 读取、
+uvarint Stream 分帧、标准 Noise/Yamux/Identify、Signed Peer Record、
+authenticated remote public key 与 pin。未支持且有意留在
 调用方：Worker leader/session/lease、Vault/HSM/gRPC 协议、业务 envelope、钱包和交易签名。
 
 普通测试与跨进程测试分离：
@@ -118,12 +127,15 @@ go test ./...
 (cd typescript && npm test)
 ./scripts/test-integration.sh
 ./scripts/test-browser-integration.sh                 # acceptance：WebSocket/Direct 各至少 20 次 + 负向矩阵
+./scripts/test-browser-interconnect.sh                # V1.3：双浏览器外部信令 WebRTC，16 MiB
+BROWSER_INTERCONNECT_PAYLOAD_BYTES=67108864 ./scripts/test-browser-interconnect.sh   # 发布验收 64 MiB
 ./scripts/test-demos.sh --all
 (cd typescript && npm pack --dry-run)                 # 发布前检查正式 tarball
 make release-check
 ```
 
-前两项离线且不会启动长期服务；中间两项是显式集成入口，使用本机随机端口和测试 key；
-最后一项检查正式 npm tarball。浏览器入口由 Playwright 启动真实 headless Chromium，不要求
-桌面或系统预装 Chromium。测试 signer 的 raw 私钥只在 Worker 中，不能照搬到生产 Window
-或 host。依赖升级后应重新安装对应 Playwright Chromium 并执行全部验收命令。
+前两项离线且不会启动长期服务；中间三项是显式集成入口，使用本机随机端口和测试 key；
+倒数第二项检查正式 npm tarball，最后一项是发布门禁。浏览器入口由 Playwright 启动真实
+headless Chromium，不要求桌面或系统预装 Chromium。测试 signer 的 raw 私钥只在 Worker 中，
+不能照搬到生产 Window 或 host。依赖升级后应重新安装对应 Playwright Chromium 并执行全部
+验收命令。

@@ -13,9 +13,30 @@ long-running listeners. The explicit integration entry points are:
 ```text
 ./scripts/test-integration.sh
 ./scripts/test-browser-integration.sh
+./scripts/test-browser-interconnect.sh
 ./scripts/test-demos.sh --quick
 ./scripts/test-demos.sh --all
 ```
+
+## V1.3 外部信令 WebRTC 验收
+
+外部信令 WebRTC 互联的浏览器验收由以下入口执行；它使用两个独立浏览器上下文、两个独立
+WorkerSigner 身份和一个独立的外部 HTTP 信令 adapter，只用于 SDK 协议边界测试：
+
+```text
+./scripts/test-browser-interconnect.sh
+BROWSER_INTERCONNECT_PAYLOAD_BYTES=16777216 ./scripts/test-browser-interconnect.sh
+BROWSER_INTERCONNECT_PAYLOAD_BYTES=67108864 ./scripts/test-browser-interconnect.sh
+```
+
+默认 payload 是 16 MiB，`64 MiB` 是发布验收规模。`BROWSER_INTERCONNECT_REPEATS` 控制
+重复次数。验收成功要求：双方通过 Noise 身份握手得到标准 libp2p `Connection`，
+`connection.remoteAddr` 包含 `/webrtc/p2p/`，并校验双向数据、多个 stream、backpressure、
+半关闭、取消和 SHA-256。不使用 Circuit Relay、TURN 或 WebSocket fallback；浏览器业务测试
+外壳不直接创建 `RTCPeerConnection` 或 DataChannel。
+
+HTTP 信令服务不是业务认证方案。keymaster 的 SatSubscription + ChannelProtocol adapter
+与真实 WOC E2E 仍是未关闭的业务验收项。
 
 ## V1.2 uvarint framing 验收
 
@@ -55,6 +76,49 @@ payload：完整 SSP Wire                        # 由 SSP 解码和校验
 
 framing 层不 import SSP、不解码业务 payload，也不把 `readStreamToEnd` 用作长期多消息
 Stream 的替代品。
+
+## V1.3 验收记录（2026-09-26）
+
+0.3.1 发布准备的全量回归已通过：
+
+```text
+go test ./...
+go vet ./...
+(cd typescript && npm test)                       # 6 files, 74 tests
+node scripts/test-framing-integration.mjs         # vectors=10, byteExact=true
+./scripts/test-browser-integration.sh             # acceptance：WebSocket 20/20、Direct 20/20 + 负向矩阵
+./scripts/test-demos.sh --all                     # 20 scenarios，含 native interop 与失败场景
+./scripts/test-browser-interconnect.sh            # 16 MiB 双浏览器外部信令
+BROWSER_INTERCONNECT_PAYLOAD_BYTES=67108864 ./scripts/test-browser-interconnect.sh   # 64 MiB 发布验收
+node scripts/release-check.mjs                    # 0.3.1 发布门禁通过
+```
+
+V1.3 外部信令 WebRTC 验收结果：16 MiB 与 64 MiB 双浏览器 E2E 均 PASS，双方
+`remoteAddr` 为 `/webrtc/p2p/<peer>`，`streams=2`、`cancelled=1`、`pendingSigners=0`，
+SHA-256 分别为 `341aacac661ccb210720bedaa9ead5d668fe5ea41a73532fc147c71e34040df1` 与
+`281e519df3077b557c6b03f5da83c4e8d397219259615dd7c3308f89cae8f2a6`。
+
+本批次同时关闭三个发布阻塞问题：
+
+1. `webrtc-interconnect` 曾 import 未声明的 `@libp2p/utils`，只因传递依赖被提升才能解析；
+   已补为精确版本直接依赖，删除未使用的 `uint8arraylist` import，并在发布门禁中新增
+   「正式 `dist` 的每条裸模块说明符必须是已声明依赖或 Node.js 内置模块」检查。
+2. `node-datachannel@0.33.1` 声明了上游从未发布的可选依赖
+   `@node-datachannel/android-arm64@0.33.1`，导致 `npm ci` 直接失败、`make release-check`
+   无法执行；已升到 `0.33.4`（`@libp2p/webrtc` 声明的 `^0.33.0` 区间内），三个 example
+   lockfile 同步修正。
+3. 完整 `npm audit` 从 0.3.0 的 7 个 high 收敛到 1 个 high，已重新审查并记录在
+   [0.3.1 npm audit 限期风险接受](../release/npm-audit-risk-acceptance-0.3.1.json)。
+
+未执行 npm publish、Go tag 创建或远程 push。
+
+环境注意：`./scripts/test-browser-integration.sh` 硬依赖 `rg`（ripgrep）读取服务端 READY
+行，缺失时会静默等待到超时而不是立即报错；`make` 与 ripgrep 都不在
+[examples/README.md](../examples/README.md) 的依赖清单里。Playwright 浏览器版本必须与
+`playwright-core` 的 `browsers.json` 匹配，升级后需重新执行 `npx playwright install chromium`。
+`./scripts/test-browser-interconnect.sh` 在 Playwright 浏览器缺失时会回退到
+`CHROME_PATH` 或 `/usr/bin/google-chrome`，其结果可能来自系统 Chrome 而非 Playwright
+自带的 Chromium。
 
 ## V1.2 验收记录（2026-09-01）
 

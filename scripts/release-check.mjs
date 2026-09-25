@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { execFileSync, spawnSync } from 'node:child_process'
 import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { builtinModules } from 'node:module'
 import { join, resolve } from 'node:path'
 import { tmpdir } from 'node:os'
 import { fileURLToPath } from 'node:url'
@@ -60,7 +61,8 @@ for (const [subpath, directory] of [
   ['./signer', 'signer'],
   ['./libp2p', 'libp2p'],
   ['./stream', 'stream'],
-  ['./webrtc-direct', 'webrtc-direct']
+  ['./webrtc-direct', 'webrtc-direct'],
+  ['./webrtc-interconnect', 'webrtc-interconnect']
 ]) {
   const exported = packageJson.exports[subpath]
   const prefix = directory === '' ? './dist/index' : `./dist/${directory}/index`
@@ -114,6 +116,21 @@ for (const path of runtimeFiles) {
   }
 }
 
+const declaredRuntimeDependencies = new Set(Object.keys(packageJson.dependencies ?? {}))
+const nodeBuiltins = new Set(builtinModules)
+const bareSpecifier = specifier => specifier.startsWith('@')
+  ? specifier.split('/').slice(0, 2).join('/')
+  : specifier.split('/')[0]
+for (const path of runtimeFiles.filter(file => file.endsWith('.js'))) {
+  const source = readFileSync(path, 'utf8')
+  for (const match of source.matchAll(/(?:from|import|require)\s*\(?\s*['"]([^'"]+)['"]/g)) {
+    const specifier = match[1]
+    if (specifier.startsWith('.') || specifier.startsWith('node:') || nodeBuiltins.has(bareSpecifier(specifier))) continue
+    const name = bareSpecifier(specifier)
+    assert(declaredRuntimeDependencies.has(name), `formal runtime imports undeclared dependency ${name} (${specifier}) in ${path}; add it to dependencies with an exact version`)
+  }
+}
+
 const temporaryDir = mkdtempSync(join(tmpdir(), 'bitcoin-libp2p-release-'))
 try {
   const packOutput = run('npm', ['pack', '--json', '--pack-destination', temporaryDir], {
@@ -144,7 +161,11 @@ try {
     'dist/webrtc-direct/index.js',
     'dist/webrtc-direct/index.d.ts',
     'dist/webrtc-direct/index.js.map',
-    'dist/webrtc-direct/index.d.ts.map'
+    'dist/webrtc-direct/index.d.ts.map',
+    'dist/webrtc-interconnect/index.js',
+    'dist/webrtc-interconnect/index.d.ts',
+    'dist/webrtc-interconnect/index.js.map',
+    'dist/webrtc-interconnect/index.d.ts.map'
   ]) {
     assert(fileNames.has(required), `formal npm tarball is missing ${required}`)
   }
@@ -172,6 +193,7 @@ import { LocalSigner } from 'bitcoin-libp2p/signer'
 import { authenticateConnection } from 'bitcoin-libp2p/libp2p'
 import { encodeUvarintFrame, readStreamToEnd, readUvarintFrames, writeUvarintFrame } from 'bitcoin-libp2p/stream'
 import { buildWebRTCDirectEndpoint, parseWebRTCDirectEndpoint } from 'bitcoin-libp2p/webrtc-direct'
+import { WebRTCInterconnectError, buildWebRTCInterconnectAddress, createWebRTCInterconnectDialer, dialWebRTCInterconnect, parseWebRTCInterconnectAddress, validateWebRTCInterconnectEnvelope } from 'bitcoin-libp2p/webrtc-interconnect'
 if (typeof createHost !== 'function') throw new Error('root export is unavailable')
 if (typeof bytesToHex !== 'function') throw new Error('identity export is unavailable')
 if (typeof LocalSigner !== 'function') throw new Error('signer export is unavailable')
@@ -179,6 +201,10 @@ if (typeof authenticateConnection !== 'function') throw new Error('libp2p export
 if (typeof readStreamToEnd !== 'function') throw new Error('stream export is unavailable')
 if (typeof encodeUvarintFrame !== 'function' || typeof readUvarintFrames !== 'function' || typeof writeUvarintFrame !== 'function') throw new Error('uvarint framing export is unavailable')
 if (typeof buildWebRTCDirectEndpoint !== 'function' || typeof parseWebRTCDirectEndpoint !== 'function') throw new Error('webrtc-direct export is unavailable')
+if (typeof buildWebRTCInterconnectAddress !== 'function' || typeof parseWebRTCInterconnectAddress !== 'function') throw new Error('webrtc-interconnect address export is unavailable')
+if (typeof createWebRTCInterconnectDialer !== 'function' || typeof dialWebRTCInterconnect !== 'function') throw new Error('webrtc-interconnect transport export is unavailable')
+if (typeof validateWebRTCInterconnectEnvelope !== 'function' || typeof WebRTCInterconnectError !== 'function') throw new Error('webrtc-interconnect signal export is unavailable')
+if (globalThis.RTCPeerConnection !== undefined) throw new Error('webrtc-interconnect requires a global RTCPeerConnection to import')
 `)
   run('node', ['runtime.mjs'], { cwd: consumerDir })
 
@@ -189,6 +215,7 @@ import { LocalSigner, type TypedSigner } from 'bitcoin-libp2p/signer'
 import { authenticateConnection, type HostConfig } from 'bitcoin-libp2p/libp2p'
 import { encodeUvarintFrame, readStreamToEnd, readUvarintFrames, writeUvarintFrame, type ReadStreamToEndOptions, type StreamFrameErrorCode, type UvarintFramingOptions } from 'bitcoin-libp2p/stream'
 import { buildWebRTCDirectEndpoint, type BuildWebRTCDirectEndpointInput, type WebRTCDirectEndpoint } from 'bitcoin-libp2p/webrtc-direct'
+import { buildWebRTCInterconnectAddress, createWebRTCInterconnectDialer, dialWebRTCInterconnect, type CreateWebRTCInterconnectHostConfig, type DialWebRTCInterconnectInput, type DialWebRTCInterconnectResult, type WebRTCInterconnectDialer, type WebRTCInterconnectEnvelope, type WebRTCInterconnectErrorCode, type WebRTCInterconnectSignal, type WebRTCInterconnectSignalingAdapter } from 'bitcoin-libp2p/webrtc-interconnect'
 const bytes: BytesLike = new Uint8Array()
 const signer: TypedSigner = new LocalSigner(new Uint8Array(32).fill(1))
 const config: HostConfig = { signer, start: false }
@@ -198,7 +225,16 @@ const options: ReadStreamToEndOptions = { timeoutMs: 15000, maxBytes: 1024 }
 const framingOptions: UvarintFramingOptions = { maxInboundFrameBytes: 1024, abortStreamOnError: true }
 const framed: Uint8Array = encodeUvarintFrame(bytes.subarray())
 const frameCode: StreamFrameErrorCode = 'ERR_FRAME_PREFIX'
-void [createHost, bytesToHex(bytes.subarray()), authenticateConnection, readStreamToEnd, readUvarintFrames, writeUvarintFrame, buildWebRTCDirectEndpoint, config, endpointInput, endpoint, options, framingOptions, framed, frameCode]
+const signaling: WebRTCInterconnectSignalingAdapter = { send () {}, subscribe () { return () => {} } }
+const interconnectConfig: CreateWebRTCInterconnectHostConfig = { signer, signaling }
+const dialInput: DialWebRTCInterconnectInput = { remotePeerId: '12D3KooW', publicKey: new Uint8Array(33) }
+const envelope: WebRTCInterconnectEnvelope = { connectionId: 'c', attemptId: 'a', from: 'f', to: 't', sequence: 1, expiresAtMs: 1, signal: { type: 'end-of-candidates' } satisfies WebRTCInterconnectSignal }
+const dialer: WebRTCInterconnectDialer = createWebRTCInterconnectDialer({ signaling })
+const interconnectAddress = buildWebRTCInterconnectAddress('12D3KooW')
+const interconnectResult: DialWebRTCInterconnectResult | undefined = undefined
+const interconnectCode: WebRTCInterconnectErrorCode = 'ERR_WEBRTC_INTERCONNECT_TIMEOUT'
+const dial: Promise<DialWebRTCInterconnectResult> = dialWebRTCInterconnect({} as never, dialInput)
+void [createHost, bytesToHex(bytes.subarray()), authenticateConnection, readStreamToEnd, readUvarintFrames, writeUvarintFrame, buildWebRTCDirectEndpoint, config, endpointInput, endpoint, options, framingOptions, framed, frameCode, interconnectConfig, envelope, dialer, interconnectAddress, interconnectResult, interconnectCode, dial]
 `)
   writeFileSync(join(consumerDir, 'tsconfig.json'), JSON.stringify({
     compilerOptions: {

@@ -3,10 +3,10 @@
 TypeScript 标准 libp2p secp256k1 identity SDK。host 只接收业务公钥和受保护的
 `TypedSigner`，不会接收业务 raw 私钥。
 
-当前 npm 包版本为 `0.3.0`，与 Go 包版本一致：
+当前 npm 包版本为 `0.3.1`，与 Go 包版本一致：
 
 ```sh
-npm install bitcoin-libp2p@0.3.0
+npm install bitcoin-libp2p@0.3.1
 ```
 
 公开入口：
@@ -16,7 +16,8 @@ npm install bitcoin-libp2p@0.3.0
 - `/signer`：受限 typed signer 接口与本地测试 signer；
 - `/libp2p`：标准 host 组装和连接后的身份认证；
 - `/stream`：有界、可取消的有限 Stream 读取，以及长期 Stream 的 uvarint 分帧；
-- `/webrtc-direct`：严格 endpoint、certhash 校验和带身份 pin 的浏览器出站拨号。
+- `/webrtc-direct`：严格 endpoint、certhash 校验和带身份 pin 的浏览器出站拨号；
+- `/webrtc-interconnect`：外部信令 WebRTC Transport，内部管理 RTCPeerConnection，业务只使用标准 libp2p Connection/Stream。
 
 ## 最小 WebRTC Direct 调用
 
@@ -57,6 +58,54 @@ const responseBytes = await response
 `readStreamToEnd` 适合有限响应，不适合长连接或无限推送。默认超时 15 秒、最大
 响应 1 MiB；超时、取消、reset 和越界会 reject，并默认 abort 当前 stream。业务
 逻辑应依据错误的 `code` 字段，不依据底层英文 message。
+
+## 外部信令 WebRTC
+
+`/webrtc-interconnect` 接收一个由业务外壳实现的通用信令 adapter。SDK 不依赖
+SatSubscription 或 ChannelProtocol；adapter 负责把 envelope 放入外部服务并路由回来：
+
+```ts
+import {
+  createWebRTCInterconnectDialer,
+  createWebRTCInterconnectHost,
+  dialWebRTCInterconnect
+} from 'bitcoin-libp2p/webrtc-interconnect'
+
+const signaling = {
+  async send (envelope) {
+    await externalSignaling.send(envelope)
+  },
+  subscribe (listener) {
+    return externalSignaling.subscribe(listener)
+  }
+}
+
+const node = await createWebRTCInterconnectHost({
+  signer,
+  signaling,
+  rtcConfiguration: { iceServers: stunServers }
+})
+
+const result = await dialWebRTCInterconnect(node, {
+  remotePeerId,
+  publicKey: expectedPublicKey,
+  timeoutMs: 30_000
+})
+const stream = await result.connection.newStream('/your/protocol/1.0.0')
+```
+
+如果应用已经由 `createHost` 创建了唯一 Host，使用
+`createWebRTCInterconnectDialer({ signaling, rtcConfiguration })`，把返回的
+`dialer.transport` 放入 Host 的 `transports`，并调用 `dialer.dial(host, input)`；
+`dialer.onConnection()` 可观察 inbound/outbound 的标准 `Connection`，不需要创建
+第二个 Host。
+
+envelope 包含 `connectionId`、`attemptId`、`from`、`to`、`sequence`、
+`expiresAtMs` 和 `offer`/`answer`/`ice-candidate`/`end-of-candidates`/`close`。
+重试必须使用新的 `attemptId`。`publicKey`/`peerId` pin 会在 Noise 握手完成后
+再次校验；`connection.remoteAddr` 为 `/webrtc/p2p/<peer>`。SDK 不提供 TURN、Circuit
+Relay 或 WebSocket fallback，`RTCPeerConnection` 和 DataChannel 只存在于 SDK 内部。
+应用仍应把 SDP/ICE envelope 放入自己的 ChannelProtocol 认证和重放保护中。
 
 ## 长期 Stream 的 uvarint 分帧
 

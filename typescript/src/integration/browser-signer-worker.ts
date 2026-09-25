@@ -5,8 +5,11 @@ import { peerIdFromPublicKeyBytes, hexToBytes } from '../identity/index.js'
 import { LocalSigner, type TypedSigner } from '../signer/index.js'
 import type { PeerRecordInput } from '../identity/index.js'
 
-const TEST_ONLY_PRIVATE_KEY = '0000000000000000000000000000000000000000000000000000000000000001'
-const signer: TypedSigner = new LocalSigner(hexToBytes(TEST_ONLY_PRIVATE_KEY, 'ERR_INVALID_PRIVATE_KEY'))
+const TEST_ONLY_PRIVATE_KEYS = [
+  '0000000000000000000000000000000000000000000000000000000000000001',
+  '0000000000000000000000000000000000000000000000000000000000000002'
+] as const
+const signers = new Map<number, TypedSigner>(TEST_ONLY_PRIVATE_KEYS.map((key, index) => [index + 1, new LocalSigner(hexToBytes(key, 'ERR_INVALID_PRIVATE_KEY'))]))
 
 interface PeerRecordWire {
   peerIdPublicKey: Uint8Array
@@ -17,6 +20,7 @@ interface PeerRecordWire {
 interface WorkerRequest {
   id: number
   purpose: 'noise' | 'peer-record'
+  keyId?: 1 | 2
   scenario?: 'pending' | 'exit' | 'stop'
   input?: Uint8Array
   record?: PeerRecordWire
@@ -45,6 +49,8 @@ workerScope.addEventListener('message', (event: MessageEvent) => {
   if (request == null || typeof request.id !== 'number') return
   void (async (): Promise<void> => {
     try {
+      const signer = signers.get(request.keyId ?? 1)
+      if (signer == null) throw new Error('unknown signer key')
       let signature: Uint8Array
       if (request.purpose === 'noise') {
         if (request.input == null) throw new Error('missing Noise input')

@@ -1,6 +1,6 @@
 {
   "name": "bitcoin-libp2p",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "license": "AGPL-3.0-only",
   "description": "Standard libp2p secp256k1 identity with a typed remote-signer boundary",
   "type": "module",
@@ -28,6 +28,10 @@
     "./webrtc-direct": {
       "types": "./dist/webrtc-direct/index.d.ts",
       "import": "./dist/webrtc-direct/index.js"
+    },
+    "./webrtc-interconnect": {
+      "types": "./dist/webrtc-interconnect/index.d.ts",
+      "import": "./dist/webrtc-interconnect/index.js"
     }
   },
   "files": [
@@ -41,12 +45,13 @@
     "dist/signer",
     "dist/libp2p",
     "dist/stream",
-    "dist/webrtc-direct"
+    "dist/webrtc-direct",
+    "dist/webrtc-interconnect"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "build:integration": "tsc -p tsconfig.integration.json",
-    "build:browser": "npm run build:integration && esbuild src/integration/browser.ts --bundle --format=esm --platform=browser --outfile=dist-integration/browser.bundle.js && esbuild src/integration/browser-signer-worker.ts --bundle --format=esm --platform=browser --outfile=dist-integration/browser-signer-worker.js",
+    "build:browser": "npm run build:integration && esbuild src/integration/browser.ts --bundle --format=esm --platform=browser --outfile=dist-integration/browser.bundle.js && esbuild src/integration/browser-interconnect.ts --bundle --format=esm --platform=browser --outfile=dist-integration/browser-interconnect.bundle.js && esbuild src/integration/browser-signer-worker.ts --bundle --format=esm --platform=browser --outfile=dist-integration/browser-signer-worker.js",
     "test": "npm run build && vitest run",
     "test:watch": "npm run build && vitest",
     "test:integration": "npm run build:integration && bash ../scripts/test-integration.sh"
@@ -60,6 +65,7 @@
     "@libp2p/peer-id": "6.0.15",
     "@libp2p/peer-id-factory": "4.2.4",
     "@libp2p/peer-record": "9.0.16",
+    "@libp2p/utils": "7.4.1",
     "@libp2p/webrtc": "6.0.31",
     "@libp2p/websockets": "10.1.20",
     "@multiformats/multiaddr": "13.0.3",
