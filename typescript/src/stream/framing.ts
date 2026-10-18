@@ -46,13 +46,58 @@ export function encodeUvarintFrame (payload: Uint8Array): Uint8Array {
 }
 
 /**
+ * 流帧计量：分帧层在数据实际到达/写出时同步调用，宿主可用它做停摆判定与交付墙钟。
+ * 计量器由调用方通过 `STREAM_FRAME_METER` 挂到 Stream 上，分帧层按符号读取；
+ * 未挂载时不影响分帧行为，任何计量回调抛错也不得影响数据路径。
+ */
+export interface StreamFrameMeter {
+  /** 底层流收到一段字节（消息到达，解析之前）。 */
+  bytesIn?(bytes: number): void
+  /** 底层流写出一段字节。 */
+  bytesOut?(bytes: number): void
+  /** 完整收下一个 uvarint 帧（解析/校验之前）。 */
+  frameReceived?(bytes: number): void
+  /** 一个 uvarint 帧已交给底层流写出。 */
+  frameSent?(bytes: number): void
+}
+
+/** Stream 上的帧计量器符号；用 Symbol.for 保证宿主与库指向同一键。 */
+export const STREAM_FRAME_METER: unique symbol = Symbol.for('bitcoin-libp2p.streamFrameMeter')
+
+/** 把计量器挂到 Stream；重复挂载覆盖旧计量器。 */
+export function setStreamFrameMeter (stream: Stream, meter: StreamFrameMeter): void {
+  ;(stream as unknown as Record<symbol, unknown>)[STREAM_FRAME_METER] = meter
+}
+
+/** 读取 Stream 上的计量器；没有则返回 undefined。 */
+export function getStreamFrameMeter (stream: Stream): StreamFrameMeter | undefined {
+  const value = (stream as unknown as Record<symbol, unknown>)[STREAM_FRAME_METER]
+  return value != null && typeof value === 'object' ? value as StreamFrameMeter : undefined
+}
+
+function notifyFrameMeter (meter: StreamFrameMeter | undefined, method: 'bytesIn' | 'bytesOut' | 'frameReceived' | 'frameSent', bytes: number): void {
+  if (meter == null) return
+  const handler = meter[method]
+  if (handler == null) return
+  try {
+    handler.call(meter, bytes)
+  } catch {
+    // 计量只服务于宿主观测，绝不阻断分帧。
+  }
+}
+
+/**
  * 编码并只调用一次 `stream.send`。
  * 返回值原样表示底层 Stream 是否仍可继续接收写入。
  */
 export function writeUvarintFrame (stream: Stream, payload: Uint8Array): boolean {
   const frame = encodeUvarintFrame(payload)
+  const meter = getStreamFrameMeter(stream)
   try {
-    return stream.send(frame)
+    const accepted = stream.send(frame)
+    notifyFrameMeter(meter, 'bytesOut', frame.byteLength)
+    notifyFrameMeter(meter, 'frameSent', frame.byteLength)
+    return accepted
   } catch (cause) {
     throw new StreamFrameError('ERR_FRAME_STREAM', 'failed to send uvarint frame', { cause })
   }
@@ -83,6 +128,7 @@ export function readUvarintFrames (stream: Stream, options: UvarintFramingOption
   const maxBufferedFrames = validateMaxBufferedLimit(options.maxBufferedFrames ?? DEFAULT_MAX_BUFFERED_FRAMES, 'maxBufferedFrames')
   const signal = options.signal
   const abortStreamOnError = options.abortStreamOnError ?? true
+  const meter = getStreamFrameMeter(stream)
 
   type TerminalState = 'open' | 'done' | 'error'
   type Waiter = {
@@ -250,6 +296,7 @@ export function readUvarintFrames (stream: Stream, options: UvarintFramingOption
 
   const emitFrame = (payload: Uint8Array): boolean => {
     if (!canQueueFrame()) return false
+    notifyFrameMeter(meter, 'frameReceived', payload.byteLength)
     if (waiters.length > 0) {
       const waiter = waiters.shift()
       if (waiter != null) waiter.resolve({ done: false, value: payload })
@@ -367,6 +414,7 @@ export function readUvarintFrames (stream: Stream, options: UvarintFramingOption
         return
       }
       appendOwnedChunk(chunk)
+      notifyFrameMeter(meter, 'bytesIn', chunk.byteLength)
       pump()
     } catch (cause) {
       failWithCode('ERR_FRAME_STREAM', 'stream emitted an invalid message chunk', cause)
