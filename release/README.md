@@ -18,30 +18,32 @@ Go module 位于仓库根目录，因此使用标准根 tag `v0.3.1`，不能使
 在仓库根目录执行：
 
 ```text
-make release-check
-./scripts/test-demos.sh --all
+node ../BSV8_Engineering/e2e/bitcoin-libp2p/release-check.mjs
+../BSV8_Engineering/e2e/bitcoin-libp2p/scripts/test-demos.sh --all
 ```
 
-`make release-check` 只修改本地依赖和临时目录，不创建 tag、不推送代码，也不发布 npm 包。
+发布门禁脚本只修改本地依赖和临时目录，不创建 tag、不推送代码，也不发布 npm 包。
 它需要只读访问 npm registry，以检查最新版和 audit 公告；同时验证版本清单、Go module、
-npm manifest/lockfile、正式 tarball 内容、所有公开入口的运行时导入和 TypeScript 声明消费，
-并运行 Go 与 TypeScript 测试。
+npm manifest/lockfile、正式 tarball 内容、所有公开入口的运行时导入和 TypeScript 声明消费。
+单元与集成测试在工程仓库 `BSV8_Engineering` 运行（见仓库 README）。
 
 发布门禁还会检查正式 `dist` 的每一条裸模块说明符：Node.js 内置模块和相对路径之外，
 必须全部是 `dependencies` 中已声明的精确版本依赖。历史问题 `webrtc-interconnect` 曾经
 import 未声明的 `@libp2p/utils`，只因传递依赖被提升到顶层才能侥幸解析；该检查用于阻止
 同类幽灵依赖再次进入正式包。
 
-完整 `npm audit` 报告只剩 1 个 high，已按
-[0.3.1 npm audit 限期风险接受](npm-audit-risk-acceptance-0.3.1.json)形成结论：审查时
-`@libp2p/webrtc` 最新稳定版是 `6.0.33`，本版本继续锁定 `6.0.31`；风险链仍位于未进入
-当前浏览器/Node.js 正式运行路径的 React Native/Metro 条件依赖，剩余公告只有
-`image-size` 的两个拒绝服务漏洞，修复版本 `2.0.3`+ 落在 `metro@0.87.0` 声明的
-`image-size ^1.0.2` 区间之外，用 overrides 强推属于未经互操作验证的隐藏告警，已拒绝。
-接受结论只对 `0.3.1` 生效并于 2026-10-26 到期。`0.3.0` 的 7 个 high 中已有 6 个被上游
-公告库修复，风险面从 7 个包收敛到 1 个包。`make release-check` 会执行完整 audit，精确核对
-包名、数量、严重级别、直接依赖版本和到期日。任一字段变化都必须重新审查，不得使用
-`npm audit fix --force` 或未经互操作验证的 overrides 隐藏告警。
+依赖审计策略（2026-10-19 起）：
+
+- `@libp2p/webrtc` 把 `react-native-webrtc` 声明为非可选 peer；npm 会自动安装它，
+  从而引入 React Native/Metro 工具链，这是此前所有 audit 告警的唯一来源。SDK 的浏览器与
+  Node.js 路径从不加载这些包。
+- 因此本仓库 `typescript/.npmrc` 设置 `omit[]=peer`，不安装该 peer；发布门禁执行
+  `npm audit --omit=peer`，**要求 0 个漏洞**。
+- 若将来审计不为空，门禁要求对应版本的
+  `release/npm-audit-risk-acceptance-<version>.json`，并精确核对包名、数量、严重级别、
+  直接依赖版本和到期日；任一字段变化都必须重新审查。不得使用 `npm audit fix --force`
+  或未经互操作验证的 overrides 隐藏告警。
+- `0.2.0`、`0.3.0`、`0.3.1` 的接受文件保留为历史记录，不再影响当前发布判定。
 
 正式发布前还必须满足：
 

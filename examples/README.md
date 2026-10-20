@@ -7,7 +7,7 @@
 前置环境：Go 1.25+、Node.js 20+、npm，以及已构建的 TypeScript SDK。首次准备（测试入口不会代替这些步骤，也不会访问 npm registry）：
 
 ```text
-go test ./...
+GOWORK=off go -C ../BSV8_Engineering/test/bitcoin-libp2p/go test -count=1 ./...
 npm ci --prefix typescript
 npm run build --prefix typescript
 npm ci --prefix examples/02-typescript-hello
@@ -37,13 +37,13 @@ cd typescript && npx playwright install chromium
 2. 阅读 [TypeScript Hello](02-typescript-hello/README.md)，用同一个 `ready.address` 运行 TS client，或执行四向快速验收：
 
    ```text
-   ./scripts/test-demos.sh --quick
+   ../BSV8_Engineering/e2e/bitcoin-libp2p/scripts/test-demos.sh --quick
    ```
 
 3. 需要私钥分离时进入 [Remote Signer Hello](04-remote-signer/README.md)；需要浏览器时进入 [Browser Worker Hello](05-browser-worker-hello/README.md)。完整矩阵（含 Chromium、native interop 和最小失败场景）使用：
 
    ```text
-   ./scripts/test-demos.sh --all
+   ../BSV8_Engineering/e2e/bitcoin-libp2p/scripts/test-demos.sh --all
    ```
 
 ## 学习路径
@@ -59,9 +59,9 @@ cd typescript && npx playwright install chromium
 
 正式的身份、签名边界与安全说明：
 
-- [V1 需求与协议边界](../docs/bitcoin-libp2p-v1-需求文档.md)
-- [Identity profile](../docs/identity-profile-v1.md)
-- [Integration test 说明](../docs/integration-tests.md)
+- [V1 需求与协议边界](../../BSV8_Engineering/todo/bitcoin-libp2p/requirements/bitcoin-libp2p-v1-需求文档.md)
+- [Identity profile](../../BSV8_Engineering/docs/bitcoin-libp2p/identity-profile-v1.md)
+- [Integration test 说明](../../BSV8_Engineering/e2e/bitcoin-libp2p/README.md)
 
 ## Cross-language 命令
 
@@ -85,4 +85,4 @@ client 的 `hello` JSON 会报告 authenticated remote `publicKey`/`peerId`、�
 
 ## 运行与验收边界
 
-`go test ./...` 和 `cd typescript && npm test` 不启动这里的子进程或浏览器。Demo E2E 只通过显式的 `scripts/test-demos.sh` 运行；测试入口只检查已准备的依赖，`--all` 的正式 SDK tarball 消费安装在临时目录且使用离线模式。找不到 Chromium 时会以非零状态明确提示 `cd typescript && npx playwright install chromium`，不会跳过。
+`BSV8_Engineering` 里的单元测试不启动这里的子进程或浏览器。Demo E2E 只通过显式的 `../BSV8_Engineering/e2e/bitcoin-libp2p/scripts/test-demos.sh` 运行；测试入口只检查已准备的依赖，`--all` 的正式 SDK tarball 消费安装在临时目录且使用离线模式。找不到 Chromium 时会以非零状态明确提示 `cd typescript && npx playwright install chromium`，不会跳过。

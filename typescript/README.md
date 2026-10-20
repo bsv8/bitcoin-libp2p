@@ -147,10 +147,10 @@ for await (const wire of frames) {
 iterator；取消、早退、超限和错误都会清理 listener、等待任务与内部缓冲。
 
 完整协议边界、字段说明、迁移清单和 Chromium/Go 验收命令见仓库中的
-[V1.1 需求](../docs/bitcoin-libp2p-v1.1-stream-webrtc-direct-需求文档.md)、
-[施工单](../施工单/20260827/004-bitcoin-libp2p-stream-webrtc-direct-sdk施工单.md)
-和 [integration tests](../docs/integration-tests.md)。
+[V1.1 需求](../../BSV8_Engineering/todo/bitcoin-libp2p/requirements/bitcoin-libp2p-v1.1-stream-webrtc-direct-需求文档.md)、
+[施工单](../../BSV8_Engineering/todo/bitcoin-libp2p/施工单/20260827/004-bitcoin-libp2p-stream-webrtc-direct-sdk施工单.md)
+和 [integration tests](../../BSV8_Engineering/e2e/bitcoin-libp2p/README.md)。
 
 V1.2 framing 的完整协议和共享字节向量见
-[V1.2 需求](../docs/bitcoin-libp2p-v1.2-uvarint-stream-framing-需求文档.md) 和
-[005 施工单](../施工单/20260901/005-bitcoin-libp2p-uvarint-stream-framing施工单.md)。
+[V1.2 需求](../../BSV8_Engineering/todo/bitcoin-libp2p/requirements/bitcoin-libp2p-v1.2-uvarint-stream-framing-需求文档.md) 和
+[005 施工单](../../BSV8_Engineering/todo/bitcoin-libp2p/施工单/20260901/005-bitcoin-libp2p-uvarint-stream-framing施工单.md)。

@@ -1,9 +1,0 @@
-{
-  "test_only": true,
-  "private_key_hex": "278d5bed18a82b66619e026c2efb2a907e35310829d9658fb967180636afaa6a",
-  "private_key_bytes": 32,
-  "public_key_hex": "02e940822d4e7a09ce013bed4fa812e92f22b0ed1fa2d1ad06ae0406680da1cc46",
-  "public_key_bytes": 33,
-  "peer_id": "16Uiu2HAmB8C2R7pBJu1z2u1gno7aXcbtkoUzrknTFN2EBLjRavKP",
-  "peer_id_encoding": "standard libp2p identity multihash, base58btc display"
-}

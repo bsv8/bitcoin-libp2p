@@ -49,37 +49,28 @@
     "dist/webrtc-interconnect"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json",
-    "build:integration": "tsc -p tsconfig.integration.json",
-    "build:browser": "npm run build:integration && esbuild src/integration/browser.ts --bundle --format=esm --platform=browser --outfile=dist-integration/browser.bundle.js && esbuild src/integration/browser-interconnect.ts --bundle --format=esm --platform=browser --outfile=dist-integration/browser-interconnect.bundle.js && esbuild src/integration/browser-signer-worker.ts --bundle --format=esm --platform=browser --outfile=dist-integration/browser-signer-worker.js",
-    "test": "npm run build && vitest run",
-    "test:watch": "npm run build && vitest",
-    "test:integration": "npm run build:integration && bash ../scripts/test-integration.sh"
+    "build": "tsc -p tsconfig.json"
   },
   "dependencies": {
     "@chainsafe/libp2p-noise": "17.0.0",
     "@chainsafe/libp2p-yamux": "8.0.1",
-    "@libp2p/crypto": "5.1.23",
-    "@libp2p/identify": "4.1.13",
-    "@libp2p/interface": "3.3.0",
-    "@libp2p/peer-id": "6.0.15",
+    "@libp2p/crypto": "5.2.0",
+    "@libp2p/identify": "4.1.18",
+    "@libp2p/interface": "3.4.0",
+    "@libp2p/peer-id": "6.0.18",
     "@libp2p/peer-id-factory": "4.2.4",
-    "@libp2p/peer-record": "9.0.16",
-    "@libp2p/utils": "7.4.1",
-    "@libp2p/webrtc": "6.0.31",
-    "@libp2p/websockets": "10.1.20",
+    "@libp2p/peer-record": "9.0.19",
+    "@libp2p/utils": "7.4.5",
+    "@libp2p/webrtc": "7.0.2",
+    "@libp2p/websockets": "10.1.25",
     "@multiformats/multiaddr": "13.0.3",
-    "@noble/curves": "2.0.1",
-    "@noble/hashes": "2.0.1",
-    "libp2p": "3.3.9",
+    "@noble/curves": "2.4.0",
+    "@noble/hashes": "2.4.0",
+    "libp2p": "3.5.1",
     "multiformats": "14.0.5"
   },
   "devDependencies": {
-    "@libp2p/tcp": "11.0.27",
-    "@playwright/test": "1.62.1",
     "@types/node": "22.20.1",
-    "esbuild": "0.28.2",
-    "typescript": "5.7.2",
-    "vitest": "4.1.11"
+    "typescript": "5.7.2"
   }
 }
