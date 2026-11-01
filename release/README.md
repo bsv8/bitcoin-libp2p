@@ -1,73 +1,53 @@
 # 双语言发布说明
 
-`release/versions.json` 是 Go 与 TypeScript 发布版本的唯一清单。`0.1.0`、`0.2.0`、
-`0.3.0` 均为已发布且不可修改的历史版本；当前待发布版本是 V1.3 的 `0.3.1`，目前仅完成
-本地发布准备，尚未发布到 npm、Go proxy 或远端 tag：
+`release/versions.json` 是 Go 与 TypeScript 的发布版本清单。当前发布配置为 `0.3.2`：
 
-- npm：`bitcoin-libp2p@0.3.1`
-- Go：`github.com/bsv8/bitcoin-libp2p@v0.3.1`
+- npm：`bitcoin-libp2p@0.3.2`，项目目录 `typescript/`。
+- Go：`github.com/bsv8/bitcoin-libp2p@v0.3.2`，根 go.mod、根标签，不用 `go/v...`。
+- 协议版本仍为 1。本次将已有源码中的可选流帧计量正式发布，取代消费方 `0.3.1` 的同功能本地补丁；保留已有 WebRTC 与 uvarint 协议。
 
-Go module 位于仓库根目录，因此使用标准根 tag `v0.3.1`，不能使用
-`go/v0.3.1`。npm 使用无 scope 的公开包名 `bitcoin-libp2p`。本批次新增
-`/webrtc-interconnect` 外部信令 WebRTC Transport，并保留 V1.2 的通用 uvarint `/stream`
-分帧与 `/webrtc-direct`。正式 tarball 不包含 integration、浏览器 bundle、
-原生测试 endpoint 或测试向量。
+已发布版本及标签不可覆盖。本文件的版本配置不代表已完成线上发布，发布后必须查询 npm 和远端标签验证。
 
 ## 发布门禁
 
-在仓库根目录执行：
+从仓库根目录运行：
 
-```text
+```sh
 node ../BSV8_Engineering/e2e/bitcoin-libp2p/release-check.mjs
 ../BSV8_Engineering/e2e/bitcoin-libp2p/scripts/test-demos.sh --all
 ```
 
-发布门禁脚本只修改本地依赖和临时目录，不创建 tag、不推送代码，也不发布 npm 包。
-它需要只读访问 npm registry，以检查最新版和 audit 公告；同时验证版本清单、Go module、
-npm manifest/lockfile、正式 tarball 内容、所有公开入口的运行时导入和 TypeScript 声明消费。
-单元与集成测试在工程仓库 `BSV8_Engineering` 运行（见仓库 README）。
+门禁不会创建标签、推送或发布 npm。它检查版本清单、Go module、npm manifest/lockfile、示例锁定的本地 SDK 版本、正式 tarball 内容，以及在隔离目录中所有公开入口的导入和 TypeScript 声明消费。测试唯一源码保留在工程仓 `test/bitcoin-libp2p/`，不复制进产品。
 
-发布门禁还会检查正式 `dist` 的每一条裸模块说明符：Node.js 内置模块和相对路径之外，
-必须全部是 `dependencies` 中已声明的精确版本依赖。历史问题 `webrtc-interconnect` 曾经
-import 未声明的 `@libp2p/utils`，只因传递依赖被提升到顶层才能侥幸解析；该检查用于阻止
-同类幽灵依赖再次进入正式包。
+正式 `dist` 的每条非相对、非 Node.js 内置模块导入都必须是 `dependencies` 声明的精确版本；不能依赖相邻仓或传递依赖提升而掩盖缺失声明。tarball 不包含测试、集成 bundle 或原生测试 endpoint。
 
-依赖审计策略（2026-10-19 起）：
+## 依赖审计策略
 
-- `@libp2p/webrtc` 把 `react-native-webrtc` 声明为非可选 peer；npm 会自动安装它，
-  从而引入 React Native/Metro 工具链，这是此前所有 audit 告警的唯一来源。SDK 的浏览器与
-  Node.js 路径从不加载这些包。
-- 因此本仓库 `typescript/.npmrc` 设置 `omit[]=peer`，不安装该 peer；发布门禁执行
-  `npm audit --omit=peer`，**要求 0 个漏洞**。
-- 若将来审计不为空，门禁要求对应版本的
-  `release/npm-audit-risk-acceptance-<version>.json`，并精确核对包名、数量、严重级别、
-  直接依赖版本和到期日；任一字段变化都必须重新审查。不得使用 `npm audit fix --force`
-  或未经互操作验证的 overrides 隐藏告警。
-- `0.2.0`、`0.3.0`、`0.3.1` 的接受文件保留为历史记录，不再影响当前发布判定。
+`@libp2p/webrtc` 的非可选 peer 会自动引入未被 SDK 浏览器/Node.js 路径加载的 React Native/Metro 工具链。`typescript/.npmrc` 使用 `omit[]=peer`，门禁执行 `npm audit --omit=peer`，要求 0 个漏洞。
 
-正式发布前还必须满足：
+若 audit 不为空，必须重新审查并提供当前版本的 `release/npm-audit-risk-acceptance-<version>.json`，精确核对包名、数量、严重级别、依赖版本和到期日。旧版本接受文件仅为历史，不能直接改版本号复用；不得用 `npm audit fix --force` 或未经互操作验证的 overrides 掩盖告警。
 
-1. 工作区干净，发布提交已经推送到远端 `main`。
-2. `npm whoami` 成功，发布账号可以发布无 scope 包。
-3. npm registry 中不存在 `bitcoin-libp2p@0.3.1`。
-4. 远端不存在 tag `v0.3.1`；不得修改或重建已发布的 `v0.2.0`、`v0.3.0` tag。
-5. Go 与 TypeScript 按同一批次发布；任一侧不具备条件时不做部分发布。
+## 正式发布
 
-建议在门禁全部通过后连续执行：
+1. 门禁通过，发布提交推送到远端 main，工作树干净。
+2. npm 登录/发布权限可用，必要时由操作者在本机完成 2FA；不把口令或一次性验证码写入源码、日志或聊天。
+3. 确认 npm `0.3.2`、远端 `v0.3.2` 尚不存在，不覆盖历史版本。
+4. Go 与 TS 同批次发布；任一侧缺少条件时不做标签单边发布。
 
-```text
-(cd typescript && npm publish)
-git tag v0.3.1
-git push origin v0.3.1
+```sh
+(cd typescript && npm publish --access public)
+git tag -a v0.3.2 -m 'bitcoin-libp2p 0.3.2'
+git push origin v0.3.2
 ```
 
-发布后验证：
+若 npm 已成功而标签推送失败，保留现场并重试原标签，不另换版本掩盖不完整批次。
 
-```text
-npm view bitcoin-libp2p@0.3.1 version
-git ls-remote --tags origin refs/tags/v0.3.1
-GOPROXY=https://proxy.golang.org go list -m github.com/bsv8/bitcoin-libp2p@v0.3.1
+## 发布后核对
+
+```sh
+npm view bitcoin-libp2p@0.3.2 version
+git ls-remote --tags origin refs/tags/v0.3.2
+GOPROXY=https://proxy.golang.org go list -m github.com/bsv8/bitcoin-libp2p@v0.3.2
 ```
 
-若 npm 发布已成功而 Git tag 推送失败，应保留现场并立即重试 tag 推送，不能改用
-另一个版本掩盖不完整批次。
+消费方删除旧补丁或本地 replace 前，必须更新精确依赖并验证构建及对应集成；发布 SDK 不自动证明消费方已切换。
